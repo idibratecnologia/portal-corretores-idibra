@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Eye, EyeOff, Lock, Mail, User, Phone, CreditCard,
   ArrowLeft, CheckCircle, Building2, Instagram, MapPin,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { mockImobiliarias } from '@/data/mockData'
+import { fetchImobiliariasPublicas } from '@/services/imobiliarias'
+import { cadastrarCorretor } from '@/services/corretores'
+import { getErrorMessage } from '@/lib/errors'
 
 const UFS = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO']
 
@@ -55,11 +57,18 @@ export function CadastroPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [success, setSuccess]     = useState(false)
 
+  const [imobiliarias, setImobiliarias] = useState<{ id: string; nome: string }[]>([])
+
+  useEffect(() => {
+    fetchImobiliariasPublicas().then(setImobiliarias).catch(() => {})
+  }, [])
+
   const [form, setForm] = useState({
     nome: '', cpf: '', creci: '', email: '',
     telefone: '', whatsapp: '', instagram: '',
     imobiliaria_id: '', cidade: '', uf: 'SP',
     password: '', confirmPassword: '',
+    whatsapp_opt_in: true,   // consentimento LGPD para receber notificações
   })
 
   const set = (key: keyof typeof form, mask?: (v: string) => string) =>
@@ -91,15 +100,23 @@ export function CadastroPage() {
 
     setIsLoading(true)
     try {
-      /**
-       * Swap with Supabase when ready:
-       *   const { error } = await supabase.from('solicitacoes_cadastro').insert({ ... })
-       *   if (error) throw error
-       */
-      await new Promise((r) => setTimeout(r, 800))
+      await cadastrarCorretor({
+        nome:     form.nome,
+        cpf:      form.cpf,
+        creci:    form.creci,
+        email:    form.email,
+        senha:    form.password,
+        telefone: form.telefone,
+        whatsapp: form.whatsapp,
+        instagram: form.instagram || undefined,
+        imobiliaria_id: form.imobiliaria_id || undefined,
+        cidade:   form.cidade,
+        uf:       form.uf,
+        whatsapp_opt_in: form.whatsapp_opt_in,
+      })
       setSuccess(true)
-    } catch {
-      setError('Erro ao enviar cadastro. Tente novamente.')
+    } catch (err) {
+      setError(getErrorMessage(err))
     } finally {
       setIsLoading(false)
     }
@@ -245,7 +262,7 @@ export function CadastroPage() {
                 className={`${inputCls} text-gray-600`}
               >
                 <option value="">Imobiliária (opcional)</option>
-                {mockImobiliarias.map((i) => (
+                {imobiliarias.map((i) => (
                   <option key={i.id} value={i.id}>{i.nome}</option>
                 ))}
               </select>
@@ -326,6 +343,20 @@ export function CadastroPage() {
                 {showPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 {showPwd ? 'Ocultar senhas' : 'Mostrar senhas'}
               </button>
+
+              {/* Consentimento LGPD para WhatsApp */}
+              <label className="flex items-start gap-2.5 p-3 rounded-xl border border-gray-200 bg-gray-50/60 cursor-pointer hover:bg-gray-100/60 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={form.whatsapp_opt_in}
+                  onChange={(e) => setForm((prev) => ({ ...prev, whatsapp_opt_in: e.target.checked }))}
+                  className="mt-0.5 w-4 h-4 rounded accent-green-600 flex-shrink-0"
+                />
+                <span className="text-[11px] text-gray-600 leading-snug">
+                  Aceito receber avisos sobre eventos, inscrições e lembretes pelo <strong>WhatsApp</strong>.
+                  Você pode revogar o consentimento a qualquer momento no seu perfil.
+                </span>
+              </label>
 
               {error && (
                 <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-xs text-red-600 font-medium flex items-center gap-2">

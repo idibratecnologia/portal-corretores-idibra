@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, Calendar, MapPin, QrCode, X, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -9,11 +9,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { mockInscricoesCorretorLogado } from '@/data/mockData'
+import { fetchMinhasInscricoes, cancelarInscricao } from '@/services/inscricoes'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
-import { usePageLoader } from '@/hooks/usePageLoader'
+import { getErrorMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
+import type { EventoInscricao } from '@/types'
 
 const statusConfig: Record<string, {
   icon: React.ElementType
@@ -32,18 +33,37 @@ const statusConfig: Record<string, {
 export function CorretorInscricoes() {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const isLoading = usePageLoader()
-  const [inscricoes, setInscricoes] = useState(mockInscricoesCorretorLogado)
+  const [isLoading, setIsLoading] = useState(true)
+  const [inscricoes, setInscricoes] = useState<EventoInscricao[]>([])
   const [qrModal, setQrModal] = useState<{ token: string; titulo: string } | null>(null)
   const [filter, setFilter] = useState<string>('todos')
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
 
+  const loadInscricoes = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      setInscricoes(await fetchMinhasInscricoes())
+    } catch (err) {
+      toast({ title: 'Erro ao carregar inscrições', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [toast])
+
+  useEffect(() => { loadInscricoes() }, [loadInscricoes])
+
   const filtered = filter === 'todos' ? inscricoes : inscricoes.filter((i) => i.status === filter)
 
-  const handleCancelar = (id: string) => {
-    setInscricoes((prev) => prev.map((i) => i.id === id ? { ...i, status: 'cancelado' as const } : i))
-    toast({ title: 'Inscrição cancelada', description: 'Sua inscrição foi cancelada.' })
-    setConfirmCancel(null)
+  const handleCancelar = async (id: string) => {
+    try {
+      await cancelarInscricao(id)
+      setInscricoes((prev) => prev.map((i) => i.id === id ? { ...i, status: 'cancelado' as const } : i))
+      toast({ title: 'Inscrição cancelada', description: 'Sua inscrição foi cancelada.' })
+    } catch (err) {
+      toast({ title: 'Erro', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setConfirmCancel(null)
+    }
   }
 
   const totais = {

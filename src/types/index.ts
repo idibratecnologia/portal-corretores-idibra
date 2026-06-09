@@ -2,7 +2,18 @@ export type StatusCorretor = 'ativo' | 'pendente' | 'bloqueado' | 'inativo'
 export type StatusImobiliaria = 'ativa' | 'inativa'
 export type StatusEvento = 'rascunho' | 'publicado' | 'encerrado' | 'cancelado'
 export type StatusInscricao = 'inscrito' | 'presente' | 'ausente' | 'cancelado'
-export type TipoEvento = 'lançamento' | 'treinamento' | 'reunião' | 'feira' | 'workshop' | 'outro'
+// Valores SEM acento — devem casar exatamente com o enum do backend/Prisma.
+export type TipoEvento = 'lancamento' | 'treinamento' | 'reuniao' | 'feira' | 'workshop' | 'outro'
+
+// Rótulos exibidos ao usuário (com acentuação correta).
+export const TIPO_EVENTO_LABELS: Record<TipoEvento, string> = {
+  lancamento:  'Lançamento',
+  treinamento: 'Treinamento',
+  reuniao:     'Reunião',
+  feira:       'Feira',
+  workshop:    'Workshop',
+  outro:       'Outro',
+}
 
 export interface Imobiliaria {
   id: string
@@ -12,6 +23,7 @@ export interface Imobiliaria {
   email: string
   cidade: string
   uf: string
+  logo_url?: string
   status: StatusImobiliaria
   created_at: string
   total_corretores?: number
@@ -25,6 +37,7 @@ export interface Corretor {
   email: string
   telefone: string
   whatsapp: string
+  whatsapp_opt_in?: boolean
   foto_url?: string
   imobiliaria_id?: string
   imobiliaria?: Imobiliaria

@@ -1,10 +1,21 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, XCircle, Users, Maximize2, Minimize2, Clock } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, XCircle, Users, Maximize2, Minimize2, Clock, Search, QrCode, X, Radio } from 'lucide-react'
 import { QrScanner } from '@/components/shared/QrScanner'
-import { mockEventos, mockInscricoes, mockCorretoresComImobiliaria } from '@/data/mockData'
+import { fetchEventoById } from '@/services/eventos'
+import { realizarCheckin } from '@/services/inscricoes'
 import { useAuth } from '@/contexts/AuthContext'
-import type { EventoInscricao } from '@/types'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useCheckinRealtime } from '@/hooks/useCheckinRealtime'
+import { cn } from '@/lib/utils'
+import type { Evento, EventoInscricao } from '@/types'
+
+type KioskMode = 'qr' | 'busca'
+
+function maskCPF(v: string) {
+  return v.replace(/\D/g, '')
+    .replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+}
 
 interface RecentCheckin {
   key: string
@@ -24,25 +35,42 @@ export function AdminCheckinKiosk() {
   const navigate = useNavigate()
   const { role } = useAuth()
 
-  const evento = mockEventos.find((e) => e.id === id)
+  const [evento, setEvento] = useState<Evento | null>(null)
 
-  const [inscricoes, setInscricoes] = useState<EventoInscricao[]>(() =>
-    mockInscricoes
-      .filter((i) => i.evento_id === id)
-      .map((i) => ({
-        ...i,
-        corretor: mockCorretoresComImobiliaria.find((c) => c.id === i.corretor_id),
-      })) as EventoInscricao[]
-  )
+  const {
+    inscricoes,
+    presentes,
+    total,
+    taxa,
+    lastUpdated,
+    applyCheckin,
+  } = useCheckinRealtime(id ?? '', [])
+
+  const [eventoLoading, setEventoLoading] = useState(true)
+
+  // Carrega os dados do evento (o hook já busca as inscrições da API)
+  useEffect(() => {
+    if (!id) return
+    fetchEventoById(id)
+      .then(setEvento)
+      .catch(() => setEvento(null))
+      .finally(() => setEventoLoading(false))
+  }, [id])
 
   const [recentCheckins, setRecentCheckins] = useState<RecentCheckin[]>([])
-  const [feedback, setFeedback] = useState<Feedback | null>(null)
+  const [feedback,     setFeedback]     = useState<Feedback | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [mode,         setMode]         = useState<KioskMode>('qr')
+  const [search,       setSearch]       = useState('')
+  const debouncedSearch = useDebouncedValue(search, 200)
+  const searchRef  = useRef<HTMLInputElement>(null)
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (role !== 'admin') navigate('/login', { replace: true })
   }, [role, navigate])
+
+  // Remove as variáveis de cálculo manual (agora vêm do hook useCheckinRealtime)
 
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(!!document.fullscreenElement)
@@ -50,9 +78,7 @@ export function AdminCheckinKiosk() {
     return () => document.removeEventListener('fullscreenchange', onFsChange)
   }, [])
 
-  const presentes = inscricoes.filter((i) => i.status === 'presente').length
-  const total = inscricoes.length
-  const taxa = total > 0 ? Math.round((presentes / total) * 100) : 0
+  // presentes, total, taxa vêm do hook useCheckinRealtime
 
   const showFeedback = (fb: Feedback) => {
     setFeedback(fb)
@@ -60,40 +86,54 @@ export function AdminCheckinKiosk() {
     feedbackTimer.current = setTimeout(() => setFeedback(null), 3000)
   }
 
-  const handleScan = useCallback((token: string) => {
-    setInscricoes((prev) => {
-      const inscricao = prev.find((i) => i.qr_code_token === token)
+  // Check-in via QR token — persiste na API e atualiza o painel
+  const handleScan = useCallback(async (token: string) => {
+    const result = await realizarCheckin(token)
 
-      if (!inscricao) {
-        showFeedback({ ok: false, title: 'QR Code inválido', subtitle: 'Token não encontrado neste evento.' })
-        return prev
-      }
-      if (inscricao.status === 'presente') {
-        const nome = inscricao.corretor?.nome ?? 'Corretor'
-        showFeedback({ ok: false, title: 'Já registrado', subtitle: `${nome} já realizou o check-in.` })
-        return prev
-      }
-      if (inscricao.status === 'cancelado') {
-        showFeedback({ ok: false, title: 'Inscrição cancelada', subtitle: 'Check-in não permitido.' })
-        return prev
-      }
+    if (!result.ok) {
+      showFeedback({ ok: false, title: result.erro === 'Check-in já realizado' ? 'Já registrado' : 'QR Code inválido', subtitle: result.erro ?? 'Token não encontrado.' })
+      return
+    }
 
-      const nome = inscricao.corretor?.nome ?? 'Corretor'
-      const imobiliaria = inscricao.corretor?.imobiliaria?.nome ?? ''
+    const nome        = result.inscricao?.corretor?.nome ?? 'Corretor'
+    const imobiliaria  = result.inscricao?.corretor?.imobiliaria?.nome ?? ''
 
-      setRecentCheckins((rc) => [
-        { key: `${inscricao.id}-${Date.now()}`, nome, imobiliaria, at: new Date().toISOString() },
-        ...rc.slice(0, 19),
-      ])
-      showFeedback({ ok: true, title: nome, subtitle: imobiliaria || 'Check-in confirmado!' })
+    applyCheckin(token)
+    setRecentCheckins((rc) => [
+      { key: `${result.inscricao?.id}-${Date.now()}`, nome, imobiliaria, at: new Date().toISOString() },
+      ...rc.slice(0, 19),
+    ])
+    showFeedback({ ok: true, title: nome, subtitle: imobiliaria || 'Check-in confirmado!' })
+  }, [applyCheckin])
 
-      return prev.map((i) =>
-        i.qr_code_token === token
-          ? { ...i, status: 'presente' as const, checkin_at: new Date().toISOString() }
-          : i
-      )
-    })
-  }, [])
+  // Check-in pela busca manual (recebe a inscrição da lista)
+  const handleManualCheckin = useCallback(async (inscricao: EventoInscricao) => {
+    if (inscricao.status === 'presente') {
+      showFeedback({ ok: false, title: 'Já registrado', subtitle: `${inscricao.corretor?.nome ?? 'Corretor'} já realizou o check-in.` })
+      return
+    }
+    if (inscricao.status === 'cancelado') {
+      showFeedback({ ok: false, title: 'Inscrição cancelada', subtitle: 'Check-in não permitido.' })
+      return
+    }
+
+    const result = await realizarCheckin(inscricao.qr_code_token)
+    if (!result.ok) {
+      showFeedback({ ok: false, title: 'Erro', subtitle: result.erro ?? 'Não foi possível registrar.' })
+      return
+    }
+
+    const nome = inscricao.corretor?.nome ?? 'Corretor'
+    const imobiliaria = inscricao.corretor?.imobiliaria?.nome ?? ''
+    applyCheckin(inscricao.qr_code_token)
+    setRecentCheckins((rc) => [
+      { key: `${inscricao.id}-${Date.now()}`, nome, imobiliaria, at: new Date().toISOString() },
+      ...rc.slice(0, 19),
+    ])
+    showFeedback({ ok: true, title: nome, subtitle: imobiliaria || 'Check-in confirmado!' })
+    setSearch('')
+    setTimeout(() => searchRef.current?.focus(), 3100)
+  }, [applyCheckin])
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -101,6 +141,18 @@ export function AdminCheckinKiosk() {
     } else {
       document.exitFullscreen().catch(() => {})
     }
+  }
+
+  if (eventoLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-950 text-white">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-bounce [animation-delay:-0.3s]" />
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-bounce [animation-delay:-0.15s]" />
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-bounce" />
+        </div>
+      </div>
+    )
   }
 
   if (!evento) {
@@ -135,6 +187,22 @@ export function AdminCheckinKiosk() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Mode toggle */}
+          <div className="flex bg-gray-800 rounded-xl p-1 border border-gray-700">
+            <button
+              onClick={() => setMode('qr')}
+              className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all', mode === 'qr' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white')}
+            >
+              <QrCode className="w-3.5 h-3.5" /> QR Code
+            </button>
+            <button
+              onClick={() => { setMode('busca'); setTimeout(() => searchRef.current?.focus(), 100) }}
+              className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all', mode === 'busca' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white')}
+            >
+              <Search className="w-3.5 h-3.5" /> Busca manual
+            </button>
+          </div>
+
           <div className="flex items-center gap-2 bg-green-950 border border-green-800 rounded-xl px-3 py-1.5">
             <Users className="w-4 h-4 text-green-400" />
             <span className="text-sm font-bold text-green-300">{presentes}</span>
@@ -154,8 +222,8 @@ export function AdminCheckinKiosk() {
       {/* ── Body ── */}
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
 
-        {/* Camera panel */}
-        <div className="relative flex-1 flex flex-col bg-black overflow-hidden">
+        {/* Main panel */}
+        <div className="relative flex-1 flex flex-col overflow-hidden" style={{ background: mode === 'qr' ? '#000' : '#030712' }}>
 
           {/* Feedback overlay */}
           {feedback && (
@@ -187,32 +255,127 @@ export function AdminCheckinKiosk() {
             </div>
           )}
 
-          {/* Scanner */}
-          <div className="flex-1 flex items-center justify-center p-4 lg:p-8">
-            <div className="w-full max-w-md">
-              <QrScanner onScan={handleScan} />
+          {/* QR Scanner mode */}
+          {mode === 'qr' && (
+            <div className="flex-1 flex items-center justify-center p-4 lg:p-8">
+              <div className="w-full max-w-md">
+                <QrScanner onScan={handleScan} />
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Mobile: progress bar + counter */}
-          <div className="lg:hidden px-4 pb-4 flex-shrink-0">
-            <div className="bg-gray-900/80 rounded-2xl p-4 border border-gray-800">
-              <div className="flex items-end justify-between mb-3">
-                <div>
-                  <span className="text-4xl font-black text-white">{presentes}</span>
-                  <span className="text-xl text-gray-500"> / {total}</span>
-                  <p className="text-xs text-gray-500 mt-0.5">presenças confirmadas</p>
-                </div>
-                <span className="text-2xl font-black text-green-400">{taxa}%</span>
-              </div>
-              <div className="h-2.5 bg-gray-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-green-500 rounded-full transition-all duration-700"
-                  style={{ width: `${taxa}%` }}
+          {/* Manual search mode */}
+          {mode === 'busca' && (
+            <div className="flex-1 flex flex-col p-5 lg:p-8 gap-4 overflow-y-auto">
+              {/* Search input */}
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                <input
+                  ref={searchRef}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar por nome ou CPF…"
+                  autoComplete="off"
+                  className="w-full h-14 pl-12 pr-10 rounded-2xl bg-gray-800 border border-gray-700 text-white text-lg placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
                 />
+                {search && (
+                  <button
+                    onClick={() => { setSearch(''); searchRef.current?.focus() }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Results */}
+              {debouncedSearch.trim().length < 2 ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <p className="text-gray-600 text-sm">Digite pelo menos 2 caracteres para buscar</p>
+                </div>
+              ) : (() => {
+                const q = debouncedSearch.trim().toLowerCase()
+                const qDigits = q.replace(/\D/g, '')
+                const results = inscricoes
+                  .filter((i) => i.status !== 'cancelado')
+                  .filter((i) => {
+                    const nome = i.corretor?.nome?.toLowerCase() ?? ''
+                    const cpf = (i.corretor?.cpf ?? '').replace(/\D/g, '')
+                    return nome.includes(q) || (qDigits.length > 0 && cpf.includes(qDigits))
+                  })
+
+                if (results.length === 0) return (
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-gray-500 text-sm">Nenhum inscrito encontrado para "{debouncedSearch.trim()}"</p>
+                  </div>
+                )
+
+                return (
+                  <div className="space-y-2">
+                    {results.map((inscricao) => {
+                      const jaPresente = inscricao.status === 'presente'
+                      return (
+                        <button
+                          key={inscricao.id}
+                          onClick={() => handleManualCheckin(inscricao)}
+                          className={cn(
+                            'w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all active:scale-[0.99]',
+                            jaPresente ? 'bg-green-950 border-green-800 hover:bg-green-900' : 'bg-gray-800 border-gray-700 hover:border-green-600 hover:bg-gray-700'
+                          )}
+                        >
+                          <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center text-lg font-black flex-shrink-0 select-none', jaPresente ? 'bg-green-800 text-green-200' : 'bg-gray-700 text-gray-300')}>
+                            {inscricao.corretor?.nome?.charAt(0) ?? '?'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-white truncate">{inscricao.corretor?.nome ?? '—'}</p>
+                            <div className="flex flex-wrap items-center gap-x-3 mt-0.5">
+                              {inscricao.corretor?.creci && <span className="text-xs text-gray-400">{inscricao.corretor.creci}</span>}
+                              {inscricao.corretor?.cpf && <span className="text-xs text-gray-500">{maskCPF(inscricao.corretor.cpf)}</span>}
+                              {inscricao.corretor?.imobiliaria?.nome && <span className="text-xs text-gray-500 truncate">{inscricao.corretor.imobiliaria.nome}</span>}
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0">
+                            {jaPresente ? (
+                              <span className="flex items-center gap-1.5 bg-green-900 text-green-300 text-xs font-bold px-3 py-1.5 rounded-xl border border-green-800">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Presente
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1.5 bg-green-600 text-white text-sm font-bold px-4 py-2 rounded-xl">
+                                <CheckCircle2 className="w-4 h-4" /> Check-in
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+
+            </div>
+          )}
+
+          {/* Mobile: progress bar + counter — QR only */}
+          {mode === 'qr' && (
+            <div className="lg:hidden px-4 pb-4 flex-shrink-0">
+              <div className="bg-gray-900/80 rounded-2xl p-4 border border-gray-800">
+                <div className="flex items-end justify-between mb-3">
+                  <div>
+                    <span className="text-4xl font-black text-white">{presentes}</span>
+                    <span className="text-xl text-gray-500"> / {total}</span>
+                    <p className="text-xs text-gray-500 mt-0.5">presenças confirmadas</p>
+                  </div>
+                  <span className="text-2xl font-black text-green-400">{taxa}%</span>
+                </div>
+                <div className="h-2.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 rounded-full transition-all duration-700"
+                    style={{ width: `${taxa}%` }}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* ── Sidebar (desktop) ── */}

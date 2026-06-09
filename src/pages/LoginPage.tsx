@@ -163,7 +163,11 @@ export function LoginPage() {
 
               {/* Forgot password */}
               <div className="flex justify-end -mt-1">
-                <button type="button" className="text-xs text-green-700 hover:text-green-600 font-medium hover:underline transition-colors">
+                <button
+                  type="button"
+                  onClick={() => navigate('/esqueci-senha')}
+                  className="text-xs text-green-700 hover:text-green-600 font-medium hover:underline transition-colors"
+                >
                   Esqueceu a senha?
                 </button>
               </div>

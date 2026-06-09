@@ -1,24 +1,55 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Calendar, Clock, MapPin, Users, ExternalLink, QrCode, X } from 'lucide-react'
+import { Calendar, Clock, MapPin, Users, ExternalLink, QrCode, X, Loader2, Maximize2 } from 'lucide-react'
 import { BackButton } from '@/components/shared/BackButton'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { QrCodeCard } from '@/components/shared/QrCodeCard'
-import { mockEventos, mockInscricoesCorretorLogado } from '@/data/mockData'
+import { fetchEventoById } from '@/services/eventos'
+import { fetchMinhasInscricoes, createInscricao, cancelarInscricao } from '@/services/inscricoes'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { getErrorMessage } from '@/lib/errors'
+import type { Evento, EventoInscricao } from '@/types'
 
 export function CorretorEventoDetalhes() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  const evento = mockEventos.find((e) => e.id === id)
-  const [inscricoes, setInscricoes] = useState(mockInscricoesCorretorLogado)
+  const [evento, setEvento] = useState<Evento | null>(null)
+  const [inscricoes, setInscricoes] = useState<EventoInscricao[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
   const [qrModal, setQrModal] = useState(false)
+  const [bannerModal, setBannerModal] = useState(false)
+  const [acting, setActing] = useState(false)
 
-  if (!evento) {
+  const loadData = useCallback(async () => {
+    if (!id) return
+    setIsLoading(true)
+    try {
+      const [ev, minhas] = await Promise.all([fetchEventoById(id), fetchMinhasInscricoes()])
+      setEvento(ev)
+      setInscricoes(minhas)
+    } catch {
+      setNotFound(true)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
+      </div>
+    )
+  }
+
+  if (notFound || !evento) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <p className="text-gray-500 mb-4">Evento não encontrado.</p>
@@ -33,40 +64,58 @@ export function CorretorEventoDetalhes() {
   const vagas = Math.max(0, evento.capacidade - totalInscritos)
   const lotado = vagas === 0 && !isInscrito
 
-  const handleInscrever = () => {
-    const nova = {
-      id: String(Date.now()),
-      evento_id: id!,
-      corretor_id: '1',
-      status: 'inscrito' as const,
-      qr_code_token: `TOKEN-${Date.now()}`,
-      created_at: new Date().toISOString(),
-      evento,
+  const handleInscrever = async () => {
+    if (acting) return
+    setActing(true)
+    try {
+      await createInscricao(id!)
+      toast({ title: 'Inscrição realizada!', description: `Você se inscreveu em "${evento.titulo}".` })
+      await loadData()
+    } catch (err) {
+      toast({ title: 'Não foi possível inscrever', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setActing(false)
     }
-    setInscricoes((prev) => [...prev, nova])
-    toast({ title: 'Inscrição realizada!', description: `Você se inscreveu em "${evento.titulo}".` })
   }
 
-  const handleCancelar = () => {
-    setInscricoes((prev) =>
-      prev.map((i) => (i.evento_id === id ? { ...i, status: 'cancelado' as const } : i))
-    )
-    toast({ title: 'Inscrição cancelada', description: 'Sua inscrição foi cancelada.' })
+  const handleCancelar = async () => {
+    if (!inscricao || acting) return
+    setActing(true)
+    try {
+      await cancelarInscricao(inscricao.id)
+      toast({ title: 'Inscrição cancelada', description: 'Sua inscrição foi cancelada.' })
+      await loadData()
+    } catch (err) {
+      toast({ title: 'Erro', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setActing(false)
+    }
   }
 
   return (
     <div className="space-y-6">
       <BackButton onClick={() => navigate('/portal/eventos')} label="Voltar aos eventos" />
 
-      {/* Banner */}
+      {/* Banner (visão reduzida — clique para ver a imagem completa) */}
       {evento.banner_url ? (
-        <img
-          src={evento.banner_url}
-          alt={evento.titulo}
-          className="w-full h-56 md:h-72 object-cover rounded-xl"
-        />
+        <button
+          type="button"
+          onClick={() => setBannerModal(true)}
+          className="group relative block w-full h-40 sm:h-52 overflow-hidden rounded-xl cursor-zoom-in"
+          aria-label="Ver imagem completa do banner"
+        >
+          <img
+            src={evento.banner_url}
+            alt={evento.titulo}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+          <span className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+            <Maximize2 className="w-3.5 h-3.5" /> Ver imagem completa
+          </span>
+        </button>
       ) : (
-        <div className="w-full h-56 md:h-72 bg-gradient-to-br from-green-100 to-green-200 rounded-xl flex items-center justify-center">
+        <div className="w-full h-40 sm:h-52 bg-gradient-to-br from-green-100 to-green-200 rounded-xl flex items-center justify-center">
           <Calendar className="w-16 h-16 text-green-400" />
         </div>
       )}
@@ -226,6 +275,28 @@ export function CorretorEventoDetalhes() {
               Fechar
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Lightbox do banner (imagem completa) */}
+      {bannerModal && evento.banner_url && (
+        <div
+          className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setBannerModal(false)}
+        >
+          <button
+            onClick={() => setBannerModal(false)}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            aria-label="Fechar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={evento.banner_url}
+            alt={evento.titulo}
+            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

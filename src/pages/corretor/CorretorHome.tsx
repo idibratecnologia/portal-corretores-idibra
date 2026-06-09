@@ -1,20 +1,22 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, ClipboardList, CheckCircle, ArrowRight, MapPin, Clock, Sparkles, TrendingUp, Users, Rocket, GraduationCap, ShoppingBag, Wrench } from 'lucide-react'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
-import { mockEventos, mockInscricoesCorretorLogado } from '@/data/mockData'
+import { fetchEventosPublicados } from '@/services/eventos'
+import { fetchMinhasInscricoes } from '@/services/inscricoes'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import type { Evento, EventoInscricao } from '@/types'
 
 const tipoBannerConfig: Record<string, { gradient: string; icon: React.ElementType; iconColor: string; dotColor: string }> = {
-  'lançamento': { gradient: 'bg-gradient-to-br from-violet-950 via-purple-900 to-indigo-950',  icon: Rocket,        iconColor: 'text-purple-300', dotColor: 'bg-purple-400' },
-  'treinamento': { gradient: 'bg-gradient-to-br from-blue-950 via-blue-900 to-cyan-950',        icon: GraduationCap, iconColor: 'text-blue-300',   dotColor: 'bg-blue-400'   },
-  'reunião':    { gradient: 'bg-gradient-to-br from-amber-950 via-orange-900 to-yellow-950',    icon: Users,         iconColor: 'text-amber-300',  dotColor: 'bg-amber-400'  },
-  'feira':      { gradient: 'bg-gradient-to-br from-pink-950 via-rose-900 to-red-950',          icon: ShoppingBag,   iconColor: 'text-pink-300',   dotColor: 'bg-pink-400'   },
-  'workshop':   { gradient: 'bg-gradient-to-br from-teal-950 via-emerald-900 to-green-950',     icon: Wrench,        iconColor: 'text-teal-300',   dotColor: 'bg-teal-400'   },
-  'outro':      { gradient: 'bg-gradient-to-br from-slate-800 via-slate-700 to-gray-800',       icon: Calendar,      iconColor: 'text-slate-400',  dotColor: 'bg-slate-400'  },
+  lancamento:  { gradient: 'bg-gradient-to-br from-violet-950 via-purple-900 to-indigo-950',  icon: Rocket,        iconColor: 'text-purple-300', dotColor: 'bg-purple-400' },
+  treinamento: { gradient: 'bg-gradient-to-br from-blue-950 via-blue-900 to-cyan-950',        icon: GraduationCap, iconColor: 'text-blue-300',   dotColor: 'bg-blue-400'   },
+  reuniao:     { gradient: 'bg-gradient-to-br from-amber-950 via-orange-900 to-yellow-950',    icon: Users,         iconColor: 'text-amber-300',  dotColor: 'bg-amber-400'  },
+  feira:       { gradient: 'bg-gradient-to-br from-pink-950 via-rose-900 to-red-950',          icon: ShoppingBag,   iconColor: 'text-pink-300',   dotColor: 'bg-pink-400'   },
+  workshop:    { gradient: 'bg-gradient-to-br from-teal-950 via-emerald-900 to-green-950',     icon: Wrench,        iconColor: 'text-teal-300',   dotColor: 'bg-teal-400'   },
+  outro:       { gradient: 'bg-gradient-to-br from-slate-800 via-slate-700 to-gray-800',       icon: Calendar,      iconColor: 'text-slate-400',  dotColor: 'bg-slate-400'  },
 }
 
 const statItems = [
@@ -28,14 +30,21 @@ export function CorretorHome() {
   const { corretor } = useAuth()
   const navigate = useNavigate()
 
-  const proximosEventos = mockEventos
-    .filter((e) => e.status === 'publicado' && e.inscricoes_abertas)
-    .slice(0, 3)
+  const [eventos, setEventos] = useState<Evento[]>([])
+  const [inscricoes, setInscricoes] = useState<EventoInscricao[]>([])
 
-  const inscricoesRecentes = mockInscricoesCorretorLogado.slice(0, 4)
-  const totalParticipacoes = mockInscricoesCorretorLogado.filter((i) => i.status === 'presente').length
-  const inscricoesAtivas   = mockInscricoesCorretorLogado.filter((i) => i.status === 'inscrito').length
-  const proximoEvento      = [...mockInscricoesCorretorLogado]
+  useEffect(() => {
+    Promise.all([fetchEventosPublicados(), fetchMinhasInscricoes()])
+      .then(([evs, ins]) => { setEventos(evs); setInscricoes(ins) })
+      .catch(() => {})
+  }, [])
+
+  const proximosEventos = eventos.slice(0, 3)
+
+  const inscricoesRecentes = inscricoes.slice(0, 4)
+  const totalParticipacoes = inscricoes.filter((i) => i.status === 'presente').length
+  const inscricoesAtivas   = inscricoes.filter((i) => i.status === 'inscrito').length
+  const proximoEvento      = [...inscricoes]
     .filter((i) => i.status === 'inscrito' && i.evento)
     .sort((a, b) => new Date(a.evento!.data_evento).getTime() - new Date(b.evento!.data_evento).getTime())[0]
 
@@ -128,7 +137,7 @@ export function CorretorHome() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {proximosEventos.map((evento) => {
-            const isInscrito = mockInscricoesCorretorLogado.some((i) => i.evento_id === evento.id && i.status !== 'cancelado')
+            const isInscrito = inscricoes.some((i) => i.evento_id === evento.id && i.status !== 'cancelado')
             const vagas = evento.capacidade - (evento.total_inscritos ?? 0)
             const bannerCfg = tipoBannerConfig[evento.tipo] ?? tipoBannerConfig['outro']
             const BannerIcon = bannerCfg.icon

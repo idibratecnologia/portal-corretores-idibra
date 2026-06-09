@@ -6,15 +6,18 @@ import {
   Users,
   Building2,
   BarChart3,
+  Bell,
   Settings,
   LogOut,
   Menu,
   X,
   ChevronRight,
+  UserCheck,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
+import { fetchCorretores } from '@/services/corretores'
 
 const navGroups = [
   {
@@ -28,6 +31,7 @@ const navGroups = [
     label: 'Cadastros',
     items: [
       { to: '/admin/corretores', icon: Users, label: 'Corretores' },
+      { to: '/admin/aprovacoes', icon: UserCheck, label: 'Aprovações' },
       { to: '/admin/imobiliarias', icon: Building2, label: 'Imobiliárias' },
     ],
   },
@@ -35,14 +39,34 @@ const navGroups = [
     label: 'Sistema',
     items: [
       { to: '/admin/relatorios', icon: BarChart3, label: 'Relatórios' },
+      { to: '/admin/notificacoes', icon: Bell, label: 'Notificações' },
       { to: '/admin/configuracoes', icon: Settings, label: 'Configurações' },
     ],
   },
 ]
 
+/** Evento global para sincronizar o contador de pendentes entre telas. */
+export const PENDING_CHANGED_EVENT = 'idibra:pending-changed'
+
 function SidebarContent({ onClose }: { onClose?: () => void }) {
   const { logout, adminUser } = useAuth()
   const navigate = useNavigate()
+  const [pendingCount, setPendingCount] = useState(0)
+
+  const loadPending = useCallback(async () => {
+    try {
+      const res = await fetchCorretores({ status: 'pendente', limit: 1 })
+      setPendingCount(res.meta.total)
+    } catch {
+      setPendingCount(0)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadPending()
+    window.addEventListener(PENDING_CHANGED_EVENT, loadPending)
+    return () => window.removeEventListener(PENDING_CHANGED_EVENT, loadPending)
+  }, [loadPending])
 
   const handleLogout = () => {
     logout()
@@ -94,7 +118,12 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                         <item.icon className="w-4 h-4" />
                       </span>
                       <span className="flex-1">{item.label}</span>
-                      {isActive && (
+                      {item.to === '/admin/aprovacoes' && pendingCount > 0 && (
+                        <span className="min-w-[18px] h-[18px] bg-amber-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
+                          {pendingCount}
+                        </span>
+                      )}
+                      {isActive && !(item.to === '/admin/aprovacoes' && pendingCount > 0) && (
                         <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                       )}
                     </>

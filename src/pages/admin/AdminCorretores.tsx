@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Eye, Edit2, UserCheck, UserX, Users } from 'lucide-react'
+import { Plus, Search, Eye, Edit2, UserCheck, UserX, Users, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -8,19 +8,46 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { SkeletonTable } from '@/components/shared/Skeleton'
 import { TablePagination } from '@/components/shared/TablePagination'
 import { CorretorModal } from '@/components/admin/CorretorModal'
-import { mockCorretoresComImobiliaria, mockImobiliarias } from '@/data/mockData'
+import { fetchCorretores, createCorretor, updateCorretor, setCorretorStatus } from '@/services/corretores'
+import { fetchImobiliarias } from '@/services/imobiliarias'
+import { PENDING_CHANGED_EVENT } from '@/components/admin/AdminSidebar'
 import { useToast } from '@/hooks/use-toast'
-import { usePageLoader } from '@/hooks/usePageLoader'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import type { Corretor } from '@/types'
+import { getErrorMessage } from '@/lib/errors'
+import { cn } from '@/lib/utils'
+import type { Corretor, Imobiliaria } from '@/types'
 
 const PAGE_SIZE = 10
+
+type SortFieldC = 'nome' | 'creci' | 'status' | 'cidade' | 'total_eventos'
+type SortDir = 'asc' | 'desc'
+
+function SortTh({ label, field, current, dir, onSort, className }: {
+  label: string; field: SortFieldC; current: SortFieldC; dir: SortDir
+  onSort: (f: SortFieldC) => void; className?: string
+}) {
+  const active = field === current
+  return (
+    <th
+      onClick={() => onSort(field)}
+      className={cn('text-left px-4 py-3 font-semibold cursor-pointer select-none group', active ? 'text-green-700' : 'text-gray-600', className)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className={cn('transition-opacity', active ? 'opacity-100 text-green-600' : 'opacity-0 group-hover:opacity-40')}>
+          {active && dir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </span>
+      </span>
+    </th>
+  )
+}
 
 export function AdminCorretores() {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const isLoading = usePageLoader()
-  const [corretores, setCorretores] = useState<Corretor[]>(mockCorretoresComImobiliaria)
+  const [isLoading, setIsLoading] = useState(true)
+  const [corretores, setCorretores] = useState<Corretor[]>([])
+  const [imobiliarias, setImobiliarias] = useState<Imobiliaria[]>([])
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search)
   const [statusFilter, setStatusFilter] = useState('')
@@ -28,6 +55,32 @@ export function AdminCorretores() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingCorretor, setEditingCorretor] = useState<Corretor | null>(null)
   const [page, setPage] = useState(1)
+  const [sortField, setSortField] = useState<SortFieldC>('nome')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const [cor, imob] = await Promise.all([
+        fetchCorretores({ limit: 100 }),
+        fetchImobiliarias(),
+      ])
+      setCorretores(cor.data)
+      setImobiliarias(imob)
+    } catch (err) {
+      toast({ title: 'Erro ao carregar corretores', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [toast])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  const toggleSort = (field: SortFieldC) => {
+    if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortField(field); setSortDir('asc') }
+    setPage(1)
+  }
 
   const filtered = corretores.filter((c) => {
     const q = debouncedSearch.toLowerCase()
@@ -40,48 +93,45 @@ export function AdminCorretores() {
     return matchSearch && matchStatus && matchImob
   })
 
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const sorted = [...filtered].sort((a, b) => {
+    const m = sortDir === 'asc' ? 1 : -1
+    switch (sortField) {
+      case 'nome':         return a.nome.localeCompare(b.nome, 'pt-BR') * m
+      case 'creci':        return a.creci.localeCompare(b.creci, 'pt-BR') * m
+      case 'status':       return a.status.localeCompare(b.status, 'pt-BR') * m
+      case 'cidade':       return a.cidade.localeCompare(b.cidade, 'pt-BR') * m
+      case 'total_eventos':return ((a.total_eventos ?? 0) - (b.total_eventos ?? 0)) * m
+      default:             return 0
+    }
+  })
+  const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const handleStatusChange = (id: string, status: Corretor['status']) => {
-    setCorretores((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)))
-    toast({ title: 'Status atualizado', description: `Corretor ${status === 'ativo' ? 'ativado' : 'bloqueado'} com sucesso.` })
+  const handleStatusChange = async (id: string, status: Corretor['status']) => {
+    try {
+      await setCorretorStatus(id, status)
+      setCorretores((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)))
+      window.dispatchEvent(new Event(PENDING_CHANGED_EVENT))
+      toast({ title: 'Status atualizado', description: `Corretor ${status === 'ativo' ? 'ativado' : 'bloqueado'} com sucesso.` })
+    } catch (err) {
+      toast({ title: 'Erro', description: getErrorMessage(err), variant: 'destructive' })
+    }
   }
 
-  const handleSave = (data: Partial<Corretor>) => {
-    if (editingCorretor) {
-      setCorretores((prev) =>
-        prev.map((c) =>
-          c.id === editingCorretor.id
-            ? { ...c, ...data, imobiliaria: mockImobiliarias.find((i) => i.id === data.imobiliaria_id) }
-            : c
-        )
-      )
-      toast({ title: 'Corretor atualizado', description: 'Dados salvos com sucesso.' })
-    } else {
-      const novo: Corretor = {
-        id: String(Date.now()),
-        nome: data.nome || '',
-        cpf: data.cpf || '',
-        creci: data.creci || '',
-        email: data.email || '',
-        telefone: data.telefone || '',
-        whatsapp: data.whatsapp || '',
-        imobiliaria_id: data.imobiliaria_id,
-        imobiliaria: mockImobiliarias.find((i) => i.id === data.imobiliaria_id),
-        cidade: data.cidade || '',
-        uf: data.uf || '',
-        instagram: data.instagram,
-        status: 'pendente',
-        observacoes_admin: data.observacoes_admin,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        total_eventos: 0,
+  const handleSave = async (data: Partial<Corretor>) => {
+    try {
+      if (editingCorretor) {
+        await updateCorretor(editingCorretor.id, data)
+        toast({ title: 'Corretor atualizado', description: 'Dados salvos com sucesso.' })
+      } else {
+        await createCorretor(data as Parameters<typeof createCorretor>[0])
+        toast({ title: 'Corretor cadastrado', description: 'Novo corretor criado com sucesso.' })
       }
-      setCorretores((prev) => [novo, ...prev])
-      toast({ title: 'Corretor cadastrado', description: 'Novo corretor criado com sucesso.' })
+      setModalOpen(false)
+      setEditingCorretor(null)
+      await loadData()
+    } catch (err) {
+      toast({ title: 'Erro ao salvar', description: getErrorMessage(err), variant: 'destructive' })
     }
-    setModalOpen(false)
-    setEditingCorretor(null)
   }
 
   return (
@@ -128,7 +178,7 @@ export function AdminCorretores() {
           className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-400 text-gray-700"
         >
           <option value="">Todas as imobiliárias</option>
-          {mockImobiliarias.map((i) => (
+          {imobiliarias.map((i) => (
             <option key={i.id} value={i.id}>{i.nome}</option>
           ))}
         </select>
@@ -148,13 +198,13 @@ export function AdminCorretores() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="text-left px-4 py-3 font-semibold text-gray-600">Nome</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-600 hidden sm:table-cell">CRECI</th>
+                    <SortTh label="Nome"    field="nome"          current={sortField} dir={sortDir} onSort={toggleSort} />
+                    <SortTh label="CRECI"   field="creci"         current={sortField} dir={sortDir} onSort={toggleSort} className="hidden sm:table-cell" />
                     <th className="text-left px-4 py-3 font-semibold text-gray-600 hidden md:table-cell">E-mail</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-600 hidden lg:table-cell">Imobiliária</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-600 hidden xl:table-cell">Cidade/UF</th>
-                    <th className="text-center px-4 py-3 font-semibold text-gray-600 hidden sm:table-cell">Eventos</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-600">Status</th>
+                    <SortTh label="Cidade/UF" field="cidade"      current={sortField} dir={sortDir} onSort={toggleSort} className="hidden xl:table-cell" />
+                    <SortTh label="Eventos" field="total_eventos"  current={sortField} dir={sortDir} onSort={toggleSort} className="hidden sm:table-cell text-center" />
+                    <SortTh label="Status"  field="status"         current={sortField} dir={sortDir} onSort={toggleSort} />
                     <th className="text-right px-4 py-3 font-semibold text-gray-600">Ações</th>
                   </tr>
                 </thead>

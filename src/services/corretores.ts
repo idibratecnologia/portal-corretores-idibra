@@ -1,42 +1,156 @@
+import { api } from '@/lib/api'
+import type { Paginated } from '@/lib/api'
 import { mockCorretoresComImobiliaria } from '@/data/mockData'
 import type { Corretor } from '@/types'
 
-// swap: import { supabase } from '@/lib/supabase'
+const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
-export async function fetchCorretores(): Promise<Corretor[]> {
-  // swap: const { data } = await supabase
-  //         .from('corretores')
-  //         .select('*, imobiliaria:imobiliarias(*)')
-  //         .order('nome')
-  //       return data ?? []
-  return mockCorretoresComImobiliaria
+// ─── Types ───────────────────────────────────────────────────────
+
+export interface CorretorFilters {
+  search?:         string
+  status?:         Corretor['status'] | ''
+  imobiliaria_id?: string
+  page?:           number
+  limit?:          number
+  sort?:           string
+  order?:          'asc' | 'desc'
 }
 
-export async function fetchCorretorById(id: string): Promise<Corretor | null> {
-  // swap: const { data } = await supabase
-  //         .from('corretores')
-  //         .select('*, imobiliaria:imobiliarias(*)')
-  //         .eq('id', id)
-  //         .single()
-  //       return data
-  return mockCorretoresComImobiliaria.find((c) => c.id === id) ?? null
+// ─── Listagem ────────────────────────────────────────────────────
+
+export async function fetchCorretores(
+  filters: CorretorFilters = {},
+): Promise<Paginated<Corretor>> {
+  if (USE_MOCK) {
+    const { search = '', status, imobiliaria_id, page = 1, limit = 10 } = filters
+    const filtered = mockCorretoresComImobiliaria.filter((c) => {
+      const q = search.toLowerCase()
+      return (
+        (!q || c.nome.toLowerCase().includes(q) || c.creci.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)) &&
+        (!status || c.status === status) &&
+        (!imobiliaria_id || c.imobiliaria_id === imobiliaria_id)
+      )
+    })
+    const total = filtered.length
+    const data  = filtered.slice((page - 1) * limit, page * limit)
+    return { data, meta: { total, page, limit, pages: Math.ceil(total / limit) } }
+  }
+
+  return api.get<Paginated<Corretor>>('/corretores', filters as Record<string, string>)
 }
 
-export async function updateCorretor(id: string, data: Partial<Corretor>): Promise<void> {
-  // swap: await supabase.from('corretores').update(data).eq('id', id)
-  console.log('[mock] updateCorretor', id, data)
+export async function fetchCorretorById(id: string): Promise<Corretor> {
+  if (USE_MOCK) {
+    const c = mockCorretoresComImobiliaria.find((c) => c.id === id)
+    if (!c) throw new Error('Corretor não encontrado')
+    return c
+  }
+
+  return api.get<Corretor>(`/corretores/${id}`)
+}
+
+/** Perfil do corretor logado (rota autenticada /corretores/me) */
+export async function fetchMeuPerfil(): Promise<Corretor> {
+  if (USE_MOCK) {
+    return mockCorretoresComImobiliaria[0]
+  }
+
+  return api.get<Corretor>('/corretores/me')
+}
+
+// ─── Mutações ────────────────────────────────────────────────────
+
+/** Auto-cadastro público de corretor (sem auth). Nasce pendente. */
+export interface CadastroData {
+  nome: string; cpf: string; creci: string; email: string; senha: string
+  telefone: string; whatsapp: string; instagram?: string
+  imobiliaria_id?: string; cidade: string; uf: string
+  whatsapp_opt_in?: boolean
+}
+
+export async function cadastrarCorretor(data: CadastroData): Promise<{ id: string }> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 600))
+    return { id: String(Date.now()) }
+  }
+
+  return api.post<{ id: string }>('/auth/cadastro', data)
 }
 
 export async function createCorretor(
-  data: Omit<Corretor, 'id' | 'created_at' | 'updated_at' | 'total_eventos'>
+  data: Omit<Corretor, 'id' | 'created_at' | 'updated_at' | 'total_eventos' | 'imobiliaria' | 'status'>,
 ): Promise<Corretor> {
-  // swap: const { data: novo } = await supabase.from('corretores').insert(data).select().single()
-  //       return novo
-  const now = new Date().toISOString()
-  return { ...data, id: String(Date.now()), created_at: now, updated_at: now, total_eventos: 0 }
+  if (USE_MOCK) {
+    const now = new Date().toISOString()
+    return { ...data, id: String(Date.now()), status: 'pendente', total_eventos: 0, created_at: now, updated_at: now }
+  }
+
+  return api.post<Corretor>('/corretores', data)
 }
 
-export async function setCorretorStatus(id: string, status: Corretor['status']): Promise<void> {
-  // swap: await supabase.from('corretores').update({ status }).eq('id', id)
-  console.log('[mock] setCorretorStatus', id, status)
+export async function updateCorretor(id: string, data: Partial<Corretor>): Promise<Corretor> {
+  if (USE_MOCK) {
+    console.log('[mock] updateCorretor', id, data)
+    const c = mockCorretoresComImobiliaria.find((c) => c.id === id)!
+    return { ...c, ...data }
+  }
+
+  return api.patch<Corretor>(`/corretores/${id}`, data)
+}
+
+export async function setCorretorStatus(
+  id: string,
+  status: Corretor['status'],
+): Promise<void> {
+  if (USE_MOCK) {
+    console.log('[mock] setCorretorStatus', id, status)
+    return
+  }
+
+  await api.patch(`/corretores/${id}/status`, { status })
+}
+
+/** Upload de foto de perfil */
+export async function uploadFotoCorretor(
+  id: string,
+  file: File,
+): Promise<{ foto_url: string }> {
+  if (USE_MOCK) {
+    return { foto_url: URL.createObjectURL(file) }
+  }
+
+  const form = new FormData()
+  form.append('foto', file)
+  return api.upload<{ foto_url: string }>(`/corretores/${id}/foto`, form)
+}
+
+/** Atualizar consentimento de notificações WhatsApp (LGPD) — admin altera de um corretor */
+export async function setWhatsappOptIn(id: string, opt_in: boolean): Promise<void> {
+  if (USE_MOCK) {
+    console.log('[mock] setWhatsappOptIn', id, opt_in)
+    return
+  }
+
+  await api.patch(`/corretores/${id}/opt-in`, { whatsapp_opt_in: opt_in })
+}
+
+/** Corretor logado edita o próprio perfil (rota /corretores/me, sem campos de admin) */
+export async function atualizarMeuPerfil(data: Partial<Corretor>): Promise<Corretor> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 400))
+    return { ...(data as Corretor) }
+  }
+
+  return api.patch<Corretor>('/corretores/me', data)
+}
+
+/** Corretor logado altera o próprio consentimento de WhatsApp (LGPD) */
+export async function atualizarMeuOptIn(opt_in: boolean): Promise<void> {
+  if (USE_MOCK) {
+    console.log('[mock] atualizarMeuOptIn', opt_in)
+    return
+  }
+
+  await api.patch('/corretores/me/opt-in', { whatsapp_opt_in: opt_in })
 }

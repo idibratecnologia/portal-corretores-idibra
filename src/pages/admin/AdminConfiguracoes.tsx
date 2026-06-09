@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Settings, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import { fetchConfiguracao, updateConfiguracao } from '@/services/configuracoes'
+import { getErrorMessage } from '@/lib/errors'
+import { WhatsappSync } from '@/components/admin/WhatsappSync'
 
 interface EmpresaForm {
   nome: string
@@ -22,34 +25,60 @@ interface RegrasForm {
 export function AdminConfiguracoes() {
   const { toast } = useToast()
 
-  const [empresa, setEmpresa] = useState<EmpresaForm>({
-    nome: 'IDIBRA',
-    email: 'contato@idibra.com.br',
-    telefone: '(11) 9999-9999',
-    site: 'https://www.idibra.com.br',
-  })
-
-  const [regras, setRegras] = useState<RegrasForm>({
-    auto_approve: true,
-    notify_inscricao: true,
-    allow_cancel: true,
-  })
+  const [loading, setLoading] = useState(true)
+  const [empresa, setEmpresa] = useState<EmpresaForm>({ nome: '', email: '', telefone: '', site: '' })
+  const [regras, setRegras] = useState<RegrasForm>({ auto_approve: false, notify_inscricao: true, allow_cancel: true })
 
   const [savingEmpresa, setSavingEmpresa] = useState(false)
   const [savingRegras, setSavingRegras] = useState(false)
 
+  useEffect(() => {
+    fetchConfiguracao()
+      .then((cfg) => {
+        setEmpresa({ nome: cfg.empresa_nome, email: cfg.empresa_email, telefone: cfg.empresa_telefone, site: cfg.empresa_site })
+        setRegras({ auto_approve: cfg.auto_approve, notify_inscricao: cfg.notify_inscricao, allow_cancel: cfg.allow_cancel })
+      })
+      .catch((err) => toast({ title: 'Erro ao carregar', description: getErrorMessage(err), variant: 'destructive' }))
+      .finally(() => setLoading(false))
+  }, [toast])
+
   const handleSaveEmpresa = async () => {
     setSavingEmpresa(true)
-    await new Promise((r) => setTimeout(r, 700))
-    setSavingEmpresa(false)
-    toast({ title: 'Dados da empresa salvos', description: 'As informações foram atualizadas com sucesso.' })
+    try {
+      await updateConfiguracao({
+        empresa_nome: empresa.nome, empresa_email: empresa.email,
+        empresa_telefone: empresa.telefone, empresa_site: empresa.site,
+      })
+      toast({ title: 'Dados da empresa salvos', description: 'As informações foram atualizadas com sucesso.' })
+    } catch (err) {
+      toast({ title: 'Erro ao salvar', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setSavingEmpresa(false)
+    }
   }
 
   const handleSaveRegras = async () => {
     setSavingRegras(true)
-    await new Promise((r) => setTimeout(r, 700))
-    setSavingRegras(false)
-    toast({ title: 'Configurações salvas', description: 'Regras de inscrição atualizadas.' })
+    try {
+      await updateConfiguracao({
+        auto_approve: regras.auto_approve,
+        notify_inscricao: regras.notify_inscricao,
+        allow_cancel: regras.allow_cancel,
+      })
+      toast({ title: 'Configurações salvas', description: 'Regras de inscrição atualizadas.' })
+    } catch (err) {
+      toast({ title: 'Erro ao salvar', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setSavingRegras(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -180,6 +209,9 @@ export function AdminConfiguracoes() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Integração WhatsApp */}
+        <WhatsappSync />
       </div>
     </div>
   )

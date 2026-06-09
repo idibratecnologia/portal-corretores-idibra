@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,8 +13,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { mockImobiliarias } from '@/data/mockData'
-import type { Corretor } from '@/types'
+import { fetchImobiliarias } from '@/services/imobiliarias'
+import type { Corretor, Imobiliaria } from '@/types'
 
 const UFS = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO']
 
@@ -48,6 +48,7 @@ const schema = z.object({
   uf: z.string().min(2, 'UF obrigatória'),
   instagram: z.string().optional(),
   observacoes_admin: z.string().optional(),
+  whatsapp_opt_in: z.boolean().optional(),
 })
 
 type FormData = z.infer<typeof schema>
@@ -60,6 +61,12 @@ interface CorretorModalProps {
 }
 
 export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModalProps) {
+  const [imobiliarias, setImobiliarias] = useState<Imobiliaria[]>([])
+
+  useEffect(() => {
+    if (open) fetchImobiliarias().then(setImobiliarias).catch(() => {})
+  }, [open])
+
   const {
     register,
     handleSubmit,
@@ -83,9 +90,10 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
         uf: corretor.uf,
         instagram: corretor.instagram || '',
         observacoes_admin: corretor.observacoes_admin || '',
+        whatsapp_opt_in: corretor.whatsapp_opt_in ?? false,
       })
     } else {
-      reset({})
+      reset({ whatsapp_opt_in: true })   // novo corretor já nasce apto a receber (admin pode desmarcar)
     }
   }, [corretor, reset])
 
@@ -157,7 +165,7 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
                 className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Selecione a imobiliária...</option>
-                {mockImobiliarias.map((i) => (
+                {imobiliarias.map((i) => (
                   <option key={i.id} value={i.id}>{i.nome}</option>
                 ))}
               </select>
@@ -190,6 +198,16 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
               <Label>Observações internas</Label>
               <Textarea {...register('observacoes_admin')} placeholder="Notas internas sobre o corretor..." className="mt-1" rows={2} />
             </div>
+
+            <label className="sm:col-span-2 flex items-start gap-2.5 p-3 rounded-xl border border-gray-100 bg-gray-50/60 cursor-pointer hover:bg-gray-100/60 transition-colors">
+              <input type="checkbox" {...register('whatsapp_opt_in')} className="mt-0.5 w-4 h-4 rounded accent-green-600 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-gray-800">Receber notificações por WhatsApp</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Consentimento (LGPD) para avisos de eventos, inscrições e lembretes. Sem isso, o corretor não recebe mensagens.
+                </p>
+              </div>
+            </label>
           </div>
 
           <DialogFooter>

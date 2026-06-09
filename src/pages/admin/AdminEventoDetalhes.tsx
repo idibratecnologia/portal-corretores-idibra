@@ -1,37 +1,64 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Users, CheckCircle, XCircle, Eye, MapPin, Calendar, Clock, QrCode, X, ScanLine, Tv2, BadgeCheck } from 'lucide-react'
+import { Users, CheckCircle, XCircle, Eye, MapPin, Calendar, Clock, QrCode, X, ScanLine, Tv2, BadgeCheck, Loader2, Maximize2, Send, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BackButton } from '@/components/shared/BackButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { StatCard } from '@/components/shared/StatCard'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { QrScanner } from '@/components/shared/QrScanner'
-import { mockEventos, mockInscricoes, mockCorretoresComImobiliaria } from '@/data/mockData'
+import { fetchEventoById } from '@/services/eventos'
+import { fetchInscricoesByEvento, realizarCheckin, setInscricaoStatus, reenviarQrInscricao, exportarPresencaCsv } from '@/services/inscricoes'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
-import type { EventoInscricao } from '@/types'
+import { getErrorMessage } from '@/lib/errors'
+import type { Evento, EventoInscricao } from '@/types'
 
 export function AdminEventoDetalhes() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  const evento = mockEventos.find((e) => e.id === id)
-  const [inscricoes, setInscricoes] = useState<EventoInscricao[]>(
-    mockInscricoes
-      .filter((i) => i.evento_id === id)
-      .map((i) => ({
-        ...i,
-        corretor: mockCorretoresComImobiliaria.find((c) => c.id === i.corretor_id),
-      }))
-  )
+  const [evento, setEvento] = useState<Evento | null>(null)
+  const [inscricoes, setInscricoes] = useState<EventoInscricao[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [bannerModal, setBannerModal] = useState(false)
+  const [reenviandoId, setReenviandoId] = useState<string | null>(null)
+  const [exportando, setExportando] = useState(false)
   const [scanResult, setScanResult] = useState<{ ok: boolean; message: string; name?: string } | null>(null)
   const [manualToken, setManualToken] = useState('')
   const scanResultTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  if (!evento) {
+  const loadData = useCallback(async () => {
+    if (!id) return
+    setIsLoading(true)
+    try {
+      const [ev, ins] = await Promise.all([
+        fetchEventoById(id),
+        fetchInscricoesByEvento(id),
+      ])
+      setEvento(ev)
+      setInscricoes(ins)
+    } catch {
+      setNotFound(true)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
+      </div>
+    )
+  }
+
+  if (notFound || !evento) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <p className="text-gray-500 mb-4">Evento não encontrado.</p>
@@ -40,53 +67,77 @@ export function AdminEventoDetalhes() {
     )
   }
 
-  const total_inscritos = inscricoes.length
+  const total_inscritos = inscricoes.filter((i) => i.status !== 'cancelado').length
   const total_presentes = inscricoes.filter((i) => i.status === 'presente').length
   const total_ausentes = inscricoes.filter((i) => i.status === 'ausente').length
   const taxa = total_inscritos > 0 ? ((total_presentes / total_inscritos) * 100).toFixed(1) : '0.0'
 
-  const handleStatus = (inscricaoId: string, status: EventoInscricao['status']) => {
-    setInscricoes((prev) =>
-      prev.map((i) =>
-        i.id === inscricaoId
-          ? { ...i, status, checkin_at: status === 'presente' ? new Date().toISOString() : undefined }
-          : i
+  const handleStatus = async (inscricaoId: string, status: 'presente' | 'ausente' | 'cancelado') => {
+    try {
+      await setInscricaoStatus(inscricaoId, status)
+      setInscricoes((prev) =>
+        prev.map((i) =>
+          i.id === inscricaoId
+            ? { ...i, status, checkin_at: status === 'presente' ? new Date().toISOString() : undefined }
+            : i
+        )
       )
-    )
-    toast({
-      title: 'Status atualizado',
-      description: status === 'presente' ? 'Presença confirmada.' : status === 'ausente' ? 'Ausência registrada.' : 'Inscrição cancelada.',
-    })
+      toast({
+        title: 'Status atualizado',
+        description: status === 'presente' ? 'Presença confirmada.' : status === 'ausente' ? 'Ausência registrada.' : 'Inscrição cancelada.',
+      })
+    } catch (err) {
+      toast({ title: 'Erro', description: getErrorMessage(err), variant: 'destructive' })
+    }
   }
 
-  const handleCheckinByToken = useCallback((token: string) => {
-    const inscricao = inscricoes.find((i) => i.qr_code_token === token)
-    if (!inscricao) {
-      setScanResult({ ok: false, message: 'QR Code não encontrado ou inválido.' })
-      return
+  const handleExportCsv = async () => {
+    setExportando(true)
+    try {
+      await exportarPresencaCsv(id!, evento?.titulo)
+      toast({ title: 'Lista exportada', description: 'O arquivo CSV foi baixado.' })
+    } catch (err) {
+      toast({ title: 'Erro ao exportar', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setExportando(false)
     }
-    if (inscricao.status === 'presente') {
-      const nome = inscricao.corretor?.nome || 'Corretor'
-      setScanResult({ ok: false, message: `${nome} já realizou o check-in.` })
-      return
+  }
+
+  const handleReenviarQr = async (inscricaoId: string) => {
+    setReenviandoId(inscricaoId)
+    try {
+      await reenviarQrInscricao(inscricaoId)
+      toast({ title: 'QR reenviado', description: 'O QR Code de check-in foi enviado no WhatsApp do corretor.' })
+    } catch (err) {
+      toast({ title: 'Não foi possível reenviar', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setReenviandoId(null)
     }
-    if (inscricao.status === 'cancelado') {
-      setScanResult({ ok: false, message: 'Inscrição cancelada. Check-in não permitido.' })
-      return
-    }
-    const nome = inscricao.corretor?.nome || 'Corretor'
-    setInscricoes((prev) =>
-      prev.map((i) =>
-        i.qr_code_token === token
-          ? { ...i, status: 'presente', checkin_at: new Date().toISOString() }
-          : i
+  }
+
+  const handleCheckinByToken = async (token: string) => {
+    try {
+      const result = await realizarCheckin(token)
+      if (!result.ok) {
+        setScanResult({ ok: false, message: result.erro || 'QR Code inválido.' })
+        return
+      }
+      const nome = result.inscricao?.corretor?.nome || 'Corretor'
+      setInscricoes((prev) =>
+        prev.map((i) =>
+          i.qr_code_token === token
+            ? { ...i, status: 'presente', checkin_at: new Date().toISOString() }
+            : i
+        )
       )
-    )
-    setScanResult({ ok: true, message: 'Check-in realizado com sucesso!', name: nome })
-    toast({ title: 'Check-in confirmado!', description: `${nome} marcado como presente.` })
-    if (scanResultTimer.current) clearTimeout(scanResultTimer.current)
-    scanResultTimer.current = setTimeout(() => setScanResult(null), 4000)
-  }, [inscricoes])
+      setScanResult({ ok: true, message: 'Check-in realizado com sucesso!', name: nome })
+      toast({ title: 'Check-in confirmado!', description: `${nome} marcado como presente.` })
+      if (scanResultTimer.current) clearTimeout(scanResultTimer.current)
+      scanResultTimer.current = setTimeout(() => setScanResult(null), 4000)
+    } catch (err) {
+      setScanResult({ ok: false, message: getErrorMessage(err) })
+    }
+  }
 
   const handleManualCheckin = () => {
     if (!manualToken.trim()) return
@@ -113,11 +164,22 @@ export function AdminEventoDetalhes() {
       {/* Evento info */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         {evento.banner_url && (
-          <img
-            src={evento.banner_url}
-            alt={evento.titulo}
-            className="w-full h-48 object-cover"
-          />
+          <button
+            type="button"
+            onClick={() => setBannerModal(true)}
+            className="group relative block w-full h-48 sm:h-56 overflow-hidden cursor-zoom-in"
+            aria-label="Ver imagem completa do banner"
+          >
+            <img
+              src={evento.banner_url}
+              alt={evento.titulo}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+            <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+            <span className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+              <Maximize2 className="w-3.5 h-3.5" /> Ver imagem completa
+            </span>
+          </button>
         )}
         <div className="p-6">
           <p className="text-gray-600 mb-4">{evento.descricao}</p>
@@ -211,8 +273,21 @@ export function AdminEventoDetalhes() {
 
       {/* Inscritos table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
           <h2 className="font-semibold text-gray-900">Lista de Inscritos ({total_inscritos})</h2>
+          {inscricoes.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCsv}
+              disabled={exportando}
+              className="border-gray-200 gap-1.5"
+            >
+              {exportando
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Exportando…</>
+                : <><Download className="w-3.5 h-3.5" /> Exportar CSV</>}
+            </Button>
+          )}
         </div>
 
         {inscricoes.length === 0 ? (
@@ -239,14 +314,14 @@ export function AdminEventoDetalhes() {
                 {inscricoes.map((inscricao) => (
                   <tr key={inscricao.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{(inscricao as any).corretor?.nome || '—'}</p>
-                      <p className="text-xs text-gray-400">{(inscricao as any).corretor?.whatsapp}</p>
+                      <p className="font-medium text-gray-900">{inscricao.corretor?.nome || '—'}</p>
+                      <p className="text-xs text-gray-400">{inscricao.corretor?.whatsapp}</p>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell text-gray-600">
-                      {(inscricao as any).corretor?.creci || '—'}
+                      {inscricao.corretor?.creci || '—'}
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell text-gray-600">
-                      {(inscricao as any).corretor?.imobiliaria?.nome || '—'}
+                      {inscricao.corretor?.imobiliaria?.nome || '—'}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell text-gray-500 text-xs">
                       {formatDate(inscricao.created_at)}
@@ -260,12 +335,24 @@ export function AdminEventoDetalhes() {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => navigate(`/admin/corretores/${(inscricao as any).corretor?.id}`)}
+                          onClick={() => navigate(`/admin/corretores/${inscricao.corretor?.id}`)}
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Ver perfil"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
+                        {inscricao.status !== 'cancelado' && (
+                          <button
+                            onClick={() => handleReenviarQr(inscricao.id)}
+                            disabled={reenviandoId === inscricao.id}
+                            className="p-1.5 text-gray-400 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="Reenviar QR no WhatsApp"
+                          >
+                            {reenviandoId === inscricao.id
+                              ? <Loader2 className="w-4 h-4 animate-spin" />
+                              : <Send className="w-4 h-4" />}
+                          </button>
+                        )}
                         {inscricao.status !== 'presente' && inscricao.status !== 'cancelado' && (
                           <button
                             onClick={() => handleStatus(inscricao.id, 'presente')}
@@ -379,6 +466,28 @@ export function AdminEventoDetalhes() {
               Fechar
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Lightbox do banner (imagem completa) */}
+      {bannerModal && evento.banner_url && (
+        <div
+          className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setBannerModal(false)}
+        >
+          <button
+            onClick={() => setBannerModal(false)}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            aria-label="Fechar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={evento.banner_url}
+            alt={evento.titulo}
+            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

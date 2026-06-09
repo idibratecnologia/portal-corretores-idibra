@@ -1,15 +1,14 @@
-import React from 'react'
-import { Users, Calendar, ClipboardList, CheckCircle, Clock, TrendingUp } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Users, Calendar, ClipboardList, CheckCircle, Clock, TrendingUp, Loader2 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
+  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area,
 } from 'recharts'
 import type { TooltipProps } from 'recharts'
 import { StatCard } from '@/components/shared/StatCard'
-import {
-  mockDashboardStats, mockParticipacaoEventos, mockInscricoesMes,
-  mockCorretoresParticipativos, mockParticipacaoImobiliaria,
-} from '@/data/mockData'
+import { fetchDashboard } from '@/services/relatorios'
+import type { DashboardData } from '@/services/relatorios'
 import { useAuth } from '@/contexts/AuthContext'
 
 const COLORS = ['#16a34a', '#2563eb', '#d97706', '#7c3aed', '#dc2626']
@@ -43,11 +42,26 @@ function ChartCard({ title, subtitle, children }: { title: string; subtitle?: st
 }
 
 export function AdminDashboard() {
-  const stats = mockDashboardStats
   const { adminUser } = useAuth()
+  const navigate = useNavigate()
+  const [data, setData] = useState<DashboardData | null>(null)
+
+  useEffect(() => {
+    fetchDashboard().then(setData).catch(() => {})
+  }, [])
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
+
+  if (!data) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
+      </div>
+    )
+  }
+
+  const stats = data.stats
 
   return (
     <div className="space-y-6">
@@ -85,7 +99,9 @@ export function AdminDashboard() {
         <StatCard title="Eventos Ativos"             value={stats.eventos_ativos}             icon={Calendar}     color="blue"   trend={5}  subtitle="Publicados e abertos" />
         <StatCard title="Inscrições Abertas"         value={stats.inscricoes_abertas}         icon={ClipboardList} color="yellow" trend={8}  subtitle="Em todos os eventos" />
         <StatCard title="Participações Confirmadas"  value={stats.participacoes_confirmadas}  icon={CheckCircle}  color="green"  trend={15} subtitle="Check-ins realizados" />
-        <StatCard title="Corretores Pendentes"       value={stats.corretores_pendentes}       icon={Clock}        color="yellow" subtitle="Aguardando aprovação" />
+        <div className="cursor-pointer" onClick={() => navigate('/admin/aprovacoes')} title="Ver aprovações pendentes">
+          <StatCard title="Corretores Pendentes" value={stats.corretores_pendentes} icon={Clock} color="yellow" subtitle="Clique para aprovar" />
+        </div>
         <StatCard title="Taxa Média de Presença"     value={`${stats.taxa_media_presenca}%`} icon={TrendingUp}   color="purple" trend={3}  subtitle="Nos eventos encerrados" />
       </div>
 
@@ -95,7 +111,7 @@ export function AdminDashboard() {
         <div className="lg:col-span-3">
           <ChartCard title="Inscrições por Mês" subtitle="Evolução mensal de inscrições">
             <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={mockInscricoesMes} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={data.inscricoes_mes} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorInscrições" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor="#16a34a" stopOpacity={0.15} />
@@ -118,13 +134,13 @@ export function AdminDashboard() {
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
-                  data={mockParticipacaoImobiliaria}
+                  data={data.participacao_imobiliaria}
                   cx="50%" cy="45%"
                   innerRadius={50} outerRadius={80}
                   dataKey="participacoes" nameKey="imobiliaria"
                   paddingAngle={3}
                 >
-                  {mockParticipacaoImobiliaria.map((_, i) => (
+                  {data.participacao_imobiliaria.map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="none" />
                   ))}
                 </Pie>
@@ -133,7 +149,7 @@ export function AdminDashboard() {
             </ResponsiveContainer>
             {/* Legend */}
             <div className="flex flex-col gap-1.5 mt-1">
-              {mockParticipacaoImobiliaria.map((item, i) => (
+              {data.participacao_imobiliaria.map((item, i) => (
                 <div key={i} className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
@@ -152,7 +168,7 @@ export function AdminDashboard() {
         {/* Participação por evento */}
         <ChartCard title="Participação por Evento" subtitle="Inscritos vs. presentes">
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={mockParticipacaoEventos} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+            <BarChart data={data.participacao_eventos} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="evento" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
@@ -166,8 +182,11 @@ export function AdminDashboard() {
         {/* Top corretores */}
         <ChartCard title="Top Corretores" subtitle="Mais participativos no período">
           <div className="space-y-3 mt-1">
-            {mockCorretoresParticipativos.map((c, i) => {
-              const pct = Math.round((c.participacoes / mockCorretoresParticipativos[0].participacoes) * 100)
+            {data.top_corretores.length === 0 && (
+              <p className="text-xs text-gray-400 text-center py-6">Nenhuma participação registrada ainda.</p>
+            )}
+            {data.top_corretores.map((c, i) => {
+              const pct = Math.round((c.participacoes / (data.top_corretores[0]?.participacoes || 1)) * 100)
               const medal = ['🥇','🥈','🥉'][i] ?? null
               return (
                 <div key={i} className="flex items-center gap-3">

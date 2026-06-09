@@ -1,16 +1,28 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { BarChart3, Download, FileText, Users, Calendar, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { SkeletonTable } from '@/components/shared/Skeleton'
 import {
-  mockEventos, mockInscricoes, mockCorretoresComImobiliaria, mockDashboardStats,
-} from '@/data/mockData'
+  fetchRelatorioEventos, fetchRelatorioCorretores, fetchRelatorioParticipacoes,
+} from '@/services/relatorios'
+import type {
+  RelatorioEvento, RelatorioCorretor, RelatorioParticipacao, Periodo,
+} from '@/services/relatorios'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
-import { usePageLoader } from '@/hooks/usePageLoader'
+import { useToast } from '@/hooks/use-toast'
+import { getErrorMessage } from '@/lib/errors'
 
 type Tab = 'eventos' | 'corretores' | 'participacoes'
+
+const PERIODOS: { key: Periodo; label: string }[] = [
+  { key: '7d',   label: '7 dias'   },
+  { key: '30d',  label: '30 dias'  },
+  { key: '90d',  label: '3 meses'  },
+  { key: '365d', label: 'Este ano' },
+  { key: 'all',  label: 'Tudo'     },
+]
 
 function downloadCSV(filename: string, rows: string[][]) {
   const csv = rows.map((r) => r.map((cell) => `"${cell}"`).join(',')).join('\n')
@@ -28,39 +40,40 @@ const taxaBadge = (pct: number) =>
     pct >= 80 ? 'bg-green-100 text-green-700' : pct >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600')
 
 export function AdminRelatorios() {
+  const { toast } = useToast()
   const [tab, setTab] = useState<Tab>('eventos')
-  const isLoading = usePageLoader()
+  const [periodo, setPeriodo] = useState<Periodo>('all')
+  const [isLoading, setIsLoading] = useState(true)
 
-  const stats = mockDashboardStats
-  const totalPresentes = mockInscricoes.filter((i) => i.status === 'presente').length
+  const [eventStats, setEventStats]       = useState<RelatorioEvento[]>([])
+  const [corretorStats, setCorretorStats] = useState<RelatorioCorretor[]>([])
+  const [participacoes, setParticipacoes] = useState<RelatorioParticipacao[]>([])
 
-  const eventStats = mockEventos
-    .filter((e) => e.status === 'publicado' || e.status === 'encerrado')
-    .map((e) => {
-      const insc = mockInscricoes.filter((i) => i.evento_id === e.id)
-      const presentes = insc.filter((i) => i.status === 'presente').length
-      const ausentes = insc.filter((i) => i.status === 'ausente').length
-      const taxa = insc.length > 0 ? Math.round((presentes / insc.length) * 100) : 0
-      return { ...e, total: insc.length, presentes, ausentes, taxa }
-    })
-    .sort((a, b) => new Date(b.data_evento).getTime() - new Date(a.data_evento).getTime())
+  const loadData = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const [ev, cor, par] = await Promise.all([
+        fetchRelatorioEventos(periodo),
+        fetchRelatorioCorretores(periodo),
+        fetchRelatorioParticipacoes(periodo),
+      ])
+      setEventStats(ev)
+      setCorretorStats(cor)
+      setParticipacoes(par)
+    } catch (err) {
+      toast({ title: 'Erro ao carregar relatórios', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [periodo, toast])
 
-  const corretorStats = mockCorretoresComImobiliaria
-    .map((c) => {
-      const insc = mockInscricoes.filter((i) => i.corretor_id === c.id)
-      const presentes = insc.filter((i) => i.status === 'presente').length
-      const taxa = insc.length > 0 ? Math.round((presentes / insc.length) * 100) : 0
-      return { ...c, total: insc.length, presentes, taxa }
-    })
-    .sort((a, b) => b.presentes - a.presentes)
+  useEffect(() => { loadData() }, [loadData])
 
-  const participacoes = mockInscricoes
-    .map((i) => ({
-      ...i,
-      evento: mockEventos.find((e) => e.id === i.evento_id),
-      corretor: mockCorretoresComImobiliaria.find((c) => c.id === i.corretor_id),
-    }))
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  const totalPresentes = participacoes.filter((p) => p.status === 'presente').length
+  const totalAusentes  = participacoes.filter((p) => p.status === 'ausente').length
+  const taxaMedia = (totalPresentes + totalAusentes) > 0
+    ? Math.round((totalPresentes / (totalPresentes + totalAusentes)) * 100)
+    : 0
 
   const exportEventos = () =>
     downloadCSV('relatorio-eventos.csv', [
@@ -96,10 +109,10 @@ export function AdminRelatorios() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Inscrições', value: mockInscricoes.length, icon: FileText, color: 'green', cls: 'stat-border-green', bg: 'bg-green-50', text: 'text-green-600' },
+          { label: 'Total Inscrições', value: participacoes.length, icon: FileText, color: 'green', cls: 'stat-border-green', bg: 'bg-green-50', text: 'text-green-600' },
           { label: 'Participações', value: totalPresentes, icon: Users, color: 'blue', cls: 'stat-border-blue', bg: 'bg-blue-50', text: 'text-blue-600' },
-          { label: 'Taxa de Presença', value: `${stats.taxa_media_presenca}%`, icon: TrendingUp, color: 'purple', cls: 'stat-border-purple', bg: 'bg-purple-50', text: 'text-purple-600' },
-          { label: 'Eventos', value: mockEventos.length, icon: Calendar, color: 'amber', cls: 'stat-border-yellow', bg: 'bg-amber-50', text: 'text-amber-600' },
+          { label: 'Taxa de Presença', value: `${taxaMedia}%`, icon: TrendingUp, color: 'purple', cls: 'stat-border-purple', bg: 'bg-purple-50', text: 'text-purple-600' },
+          { label: 'Eventos', value: eventStats.length, icon: Calendar, color: 'amber', cls: 'stat-border-yellow', bg: 'bg-amber-50', text: 'text-amber-600' },
         ].map((s) => (
           <div key={s.label} className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 ${s.cls}`}>
             <div className="flex items-center justify-between mb-3">
@@ -110,6 +123,25 @@ export function AdminRelatorios() {
             </div>
             <p className="text-2xl font-bold text-gray-900">{s.value}</p>
           </div>
+        ))}
+      </div>
+
+      {/* Period filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide mr-1">Período:</span>
+        {PERIODOS.map((p) => (
+          <button
+            key={p.key}
+            onClick={() => setPeriodo(p.key)}
+            className={cn(
+              'px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all',
+              periodo === p.key
+                ? 'bg-green-700 text-white border-green-700'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-green-400 hover:text-green-700'
+            )}
+          >
+            {p.label}
+          </button>
         ))}
       </div>
 

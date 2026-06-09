@@ -1,13 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { History, Calendar, MapPin, CheckCircle } from 'lucide-react'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Skeleton } from '@/components/shared/Skeleton'
-import { mockInscricoes, mockEventos } from '@/data/mockData'
-import { useAuth } from '@/contexts/AuthContext'
+import { fetchMinhasInscricoes } from '@/services/inscricoes'
 import { formatDate } from '@/lib/utils'
-import { usePageLoader } from '@/hooks/usePageLoader'
 import { cn } from '@/lib/utils'
+import type { EventoInscricao } from '@/types'
 
 const statusBarColor: Record<string, string> = {
   presente:  '#4ade80',
@@ -16,13 +15,19 @@ const statusBarColor: Record<string, string> = {
 }
 
 export function CorretorHistorico() {
-  const { corretor } = useAuth()
-  const isLoading = usePageLoader()
+  const [isLoading, setIsLoading] = useState(true)
+  const [inscricoes, setInscricoes] = useState<EventoInscricao[]>([])
   const [filter, setFilter] = useState('todos')
 
-  const historico = mockInscricoes
-    .filter((i) => i.corretor_id === corretor?.id && (i.status === 'presente' || i.status === 'ausente' || i.status === 'cancelado'))
-    .map((i) => ({ ...i, evento: mockEventos.find((e) => e.id === i.evento_id) }))
+  useEffect(() => {
+    fetchMinhasInscricoes()
+      .then(setInscricoes)
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [])
+
+  const historico = inscricoes
+    .filter((i) => i.status === 'presente' || i.status === 'ausente' || i.status === 'cancelado')
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   const totalPresentes = historico.filter((i) => i.status === 'presente').length

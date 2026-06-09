@@ -1,47 +1,71 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Calendar, MapPin, Clock, Users, Filter, Rocket, GraduationCap, ShoppingBag, Wrench } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Skeleton } from '@/components/shared/Skeleton'
-import { mockEventos, mockInscricoesCorretorLogado } from '@/data/mockData'
+import { fetchEventosPublicados } from '@/services/eventos'
+import { fetchMinhasInscricoes, createInscricao } from '@/services/inscricoes'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
-import { usePageLoader } from '@/hooks/usePageLoader'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { getErrorMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
+import type { Evento, EventoInscricao } from '@/types'
+import { TIPO_EVENTO_LABELS } from '@/types'
 
-const tiposEvento = ['lançamento', 'treinamento', 'reunião', 'feira', 'workshop']
+const tiposEvento = ['lancamento', 'treinamento', 'reuniao', 'feira', 'workshop']
 
 const tipoColors: Record<string, string> = {
-  'lançamento': 'bg-purple-100 text-purple-700',
-  'treinamento': 'bg-blue-100 text-blue-700',
-  'reunião':     'bg-orange-100 text-orange-700',
-  'feira':       'bg-pink-100 text-pink-700',
-  'workshop':    'bg-teal-100 text-teal-700',
-  'outro':       'bg-gray-100 text-gray-600',
+  lancamento:  'bg-purple-100 text-purple-700',
+  treinamento: 'bg-blue-100 text-blue-700',
+  reuniao:     'bg-orange-100 text-orange-700',
+  feira:       'bg-pink-100 text-pink-700',
+  workshop:    'bg-teal-100 text-teal-700',
+  outro:       'bg-gray-100 text-gray-600',
 }
 
 const tipoBannerConfig: Record<string, { gradient: string; icon: React.ElementType; iconColor: string; dotColor: string }> = {
-  'lançamento': { gradient: 'bg-gradient-to-br from-violet-950 via-purple-900 to-indigo-950',  icon: Rocket,       iconColor: 'text-purple-300', dotColor: 'bg-purple-400' },
-  'treinamento': { gradient: 'bg-gradient-to-br from-blue-950 via-blue-900 to-cyan-950',        icon: GraduationCap, iconColor: 'text-blue-300',   dotColor: 'bg-blue-400'   },
-  'reunião':    { gradient: 'bg-gradient-to-br from-amber-950 via-orange-900 to-yellow-950',    icon: Users,        iconColor: 'text-amber-300',  dotColor: 'bg-amber-400'  },
-  'feira':      { gradient: 'bg-gradient-to-br from-pink-950 via-rose-900 to-red-950',          icon: ShoppingBag,  iconColor: 'text-pink-300',   dotColor: 'bg-pink-400'   },
-  'workshop':   { gradient: 'bg-gradient-to-br from-teal-950 via-emerald-900 to-green-950',     icon: Wrench,       iconColor: 'text-teal-300',   dotColor: 'bg-teal-400'   },
-  'outro':      { gradient: 'bg-gradient-to-br from-slate-800 via-slate-700 to-gray-800',       icon: Calendar,     iconColor: 'text-slate-400',  dotColor: 'bg-slate-400'  },
+  lancamento:  { gradient: 'bg-gradient-to-br from-violet-950 via-purple-900 to-indigo-950',  icon: Rocket,       iconColor: 'text-purple-300', dotColor: 'bg-purple-400' },
+  treinamento: { gradient: 'bg-gradient-to-br from-blue-950 via-blue-900 to-cyan-950',        icon: GraduationCap, iconColor: 'text-blue-300',   dotColor: 'bg-blue-400'   },
+  reuniao:     { gradient: 'bg-gradient-to-br from-amber-950 via-orange-900 to-yellow-950',    icon: Users,        iconColor: 'text-amber-300',  dotColor: 'bg-amber-400'  },
+  feira:       { gradient: 'bg-gradient-to-br from-pink-950 via-rose-900 to-red-950',          icon: ShoppingBag,  iconColor: 'text-pink-300',   dotColor: 'bg-pink-400'   },
+  workshop:    { gradient: 'bg-gradient-to-br from-teal-950 via-emerald-900 to-green-950',     icon: Wrench,       iconColor: 'text-teal-300',   dotColor: 'bg-teal-400'   },
+  outro:       { gradient: 'bg-gradient-to-br from-slate-800 via-slate-700 to-gray-800',       icon: Calendar,     iconColor: 'text-slate-400',  dotColor: 'bg-slate-400'  },
 }
 
 export function CorretorEventos() {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const isLoading = usePageLoader()
+  const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search)
   const [tipoFilter, setTipoFilter] = useState('')
-  const [inscricoes, setInscricoes] = useState(mockInscricoesCorretorLogado)
+  const [eventosPublicados, setEventosPublicados] = useState<Evento[]>([])
+  const [inscricoes, setInscricoes] = useState<EventoInscricao[]>([])
+  const [inscrevendo, setInscrevendo] = useState<string | null>(null)
 
-  const eventosPublicados = mockEventos.filter((e) => e.status === 'publicado' && e.inscricoes_abertas)
+  const loadData = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const [eventos, minhas] = await Promise.all([
+        fetchEventosPublicados(),
+        fetchMinhasInscricoes(),
+      ])
+      setEventosPublicados(eventos)
+      setInscricoes(minhas)
+    } catch (err) {
+      toast({ title: 'Erro ao carregar eventos', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [toast])
+
+  useEffect(() => { loadData() }, [loadData])
+
   const filtered = eventosPublicados.filter((e) => {
-    const q = search.toLowerCase()
+    const q = debouncedSearch.toLowerCase()
     return (
       (e.titulo.toLowerCase().includes(q) || e.local.toLowerCase().includes(q)) &&
       (!tipoFilter || e.tipo === tipoFilter)
@@ -50,15 +74,18 @@ export function CorretorEventos() {
 
   const isInscrito = (id: string) => inscricoes.some((i) => i.evento_id === id && i.status !== 'cancelado')
 
-  const handleInscrever = (eventoId: string, titulo: string) => {
-    if (isInscrito(eventoId)) return
-    setInscricoes((prev) => [...prev, {
-      id: String(Date.now()), evento_id: eventoId, corretor_id: '1',
-      status: 'inscrito', qr_code_token: `TOKEN-${Date.now()}`,
-      created_at: new Date().toISOString(),
-      evento: mockEventos.find((e) => e.id === eventoId),
-    } as any])
-    toast({ title: 'Inscrição confirmada!', description: `Você se inscreveu em "${titulo}".` })
+  const handleInscrever = async (eventoId: string, titulo: string) => {
+    if (isInscrito(eventoId) || inscrevendo) return
+    setInscrevendo(eventoId)
+    try {
+      await createInscricao(eventoId)
+      toast({ title: 'Inscrição confirmada!', description: `Você se inscreveu em "${titulo}".` })
+      await loadData()   // recarrega para refletir vagas e status
+    } catch (err) {
+      toast({ title: 'Não foi possível inscrever', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setInscrevendo(null)
+    }
   }
 
   return (
@@ -86,9 +113,9 @@ export function CorretorEventos() {
             <button
               key={tipo}
               onClick={() => setTipoFilter(tipoFilter === tipo ? '' : tipo)}
-              className={cn('px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap border capitalize transition-all', tipoFilter === tipo ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
+              className={cn('px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all', tipoFilter === tipo ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
             >
-              {tipo}
+              {TIPO_EVENTO_LABELS[tipo as keyof typeof TIPO_EVENTO_LABELS] ?? tipo}
             </button>
           ))}
         </div>
@@ -138,14 +165,14 @@ export function CorretorEventos() {
                       <div className={cn('absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl opacity-30', bannerCfg.dotColor)} />
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5">
                         <BannerIcon className={cn('w-14 h-14', bannerCfg.iconColor)} strokeWidth={1.5} />
-                        <span className={cn('text-[10px] font-bold uppercase tracking-[0.25em] opacity-60', bannerCfg.iconColor)}>{evento.tipo}</span>
+                        <span className={cn('text-[10px] font-bold uppercase tracking-[0.25em] opacity-60', bannerCfg.iconColor)}>{TIPO_EVENTO_LABELS[evento.tipo] ?? evento.tipo}</span>
                       </div>
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                   <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
                     <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full backdrop-blur-sm', tipoColor)}>
-                      {evento.tipo}
+                      {TIPO_EVENTO_LABELS[evento.tipo] ?? evento.tipo}
                     </span>
                     {inscrito && (
                       <span className="text-[10px] font-bold bg-green-500 text-white px-2.5 py-1 rounded-full shadow-sm">

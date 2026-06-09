@@ -1,15 +1,20 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { User, Mail, Phone, MessageCircle, Instagram, MapPin, Building2, Save, Camera, Loader2 } from 'lucide-react'
+import { User, Mail, Phone, MessageCircle, Instagram, MapPin, Building2, Save, Camera, Loader2, ImageOff, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { TrocarSenhaModal } from '@/components/shared/TrocarSenhaModal'
+import { ImageCropModal } from '@/components/shared/ImageCropModal'
 import { useAuth } from '@/contexts/AuthContext'
-import { mockImobiliarias } from '@/data/mockData'
+import { fetchImobiliarias } from '@/services/imobiliarias'
+import type { Imobiliaria } from '@/types'
 import { useToast } from '@/hooks/use-toast'
+import { atualizarMeuPerfil, uploadFotoCorretor, atualizarMeuOptIn } from '@/services/corretores'
+import { getErrorMessage } from '@/lib/errors'
 
 function maskCPF(v: string) {
   return v.replace(/\D/g, '').slice(0, 11)
@@ -44,6 +49,18 @@ export function CorretorPerfil() {
   const { corretor } = useAuth()
   const { toast } = useToast()
   const [editing, setEditing] = useState(false)
+  const [photoUrl, setPhotoUrl]           = useState<string | null>(corretor?.foto_url ?? null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [imobiliarias, setImobiliarias] = useState<Imobiliaria[]>([])
+  const [senhaModalOpen, setSenhaModalOpen] = useState(false)
+  const [optIn, setOptIn] = useState<boolean>(corretor?.whatsapp_opt_in ?? false)
+  const [savingOptIn, setSavingOptIn] = useState(false)
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetchImobiliarias().then(setImobiliarias).catch(() => {})
+  }, [])
 
   const {
     register,
@@ -78,22 +95,92 @@ export function CorretorPerfil() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError]   = useState('')
 
-  const onSubmit = async (_data: FormData) => {
+  // Seleciona o arquivo → abre o editor de recorte (não envia ainda)
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !corretor?.id) return
+
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Formato inválido', description: 'Selecione uma imagem (JPG, PNG ou WebP).', variant: 'destructive' })
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Arquivo muito grande', description: 'A foto deve ter no máximo 5 MB.', variant: 'destructive' })
+      return
+    }
+
+    setCropSrc(URL.createObjectURL(file))
+    // Limpa o input para permitir selecionar o mesmo arquivo novamente
+    if (photoInputRef.current) photoInputRef.current.value = ''
+  }
+
+  // Confirma o recorte → envia a imagem já posicionada/zoom aplicada
+  const handleCropConfirm = async (blob: Blob) => {
+    if (!corretor?.id) return
+    const file = new File([blob], 'foto.webp', { type: 'image/webp' })
+
+    setPhotoUrl(URL.createObjectURL(blob)) // preview imediato
+    setUploadingPhoto(true)
+    try {
+      const { foto_url } = await uploadFotoCorretor(corretor.id, file)
+      setPhotoUrl(foto_url)
+      toast({ title: 'Foto atualizada!', description: 'Sua foto de perfil foi salva.' })
+    } catch (err) {
+      setPhotoUrl(corretor.foto_url ?? null)
+      toast({ title: 'Erro no upload', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setUploadingPhoto(false)
+      setCropSrc(null)
+    }
+  }
+
+  const onSubmit = async (data: FormData) => {
     setIsSubmitting(true)
     setSubmitError('')
     try {
-      // Swap with: await supabase.from('corretores').update({ ... }).eq('id', corretor?.id)
-      await new Promise((r) => setTimeout(r, 600))
+      if (corretor?.id) {
+        await atualizarMeuPerfil({
+          nome:           data.nome,
+          cpf:            data.cpf,
+          creci:          data.creci,
+          telefone:       data.telefone,
+          whatsapp:       data.whatsapp,
+          imobiliaria_id: data.imobiliaria_id || undefined,
+          cidade:         data.cidade,
+          uf:             data.uf,
+          instagram:      data.instagram,
+        })
+      }
       toast({ title: 'Perfil atualizado!', description: 'Suas informações foram salvas com sucesso.' })
       setEditing(false)
-    } catch {
-      setSubmitError('Erro ao salvar. Tente novamente.')
+    } catch (err) {
+      setSubmitError(getErrorMessage(err))
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const imobiliaria = mockImobiliarias.find((i) => i.id === corretor?.imobiliaria_id)
+  const handleToggleOptIn = async () => {
+    const novo = !optIn
+    setOptIn(novo)            // otimista
+    setSavingOptIn(true)
+    try {
+      await atualizarMeuOptIn(novo)
+      toast({
+        title: novo ? 'Notificações ativadas' : 'Notificações desativadas',
+        description: novo
+          ? 'Você passará a receber avisos de eventos e lembretes no WhatsApp.'
+          : 'Você não receberá mais mensagens no WhatsApp.',
+      })
+    } catch (err) {
+      setOptIn(!novo)         // reverte em caso de erro
+      toast({ title: 'Erro ao salvar', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setSavingOptIn(false)
+    }
+  }
+
+  const imobiliaria = corretor?.imobiliaria ?? imobiliarias.find((i) => i.id === corretor?.imobiliaria_id)
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -103,29 +190,74 @@ export function CorretorPerfil() {
           <p className="text-gray-500 text-sm mt-1">Gerencie suas informações profissionais</p>
         </div>
         {!editing && (
-          <Button
-            onClick={() => setEditing(true)}
-            variant="outline"
-            className="border-green-200 text-green-700 hover:bg-green-50"
-          >
-            Editar perfil
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setSenhaModalOpen(true)}
+              variant="outline"
+              className="border-gray-200 text-gray-600 hover:bg-gray-50 gap-1.5"
+            >
+              <Lock className="w-3.5 h-3.5" /> Trocar senha
+            </Button>
+            <Button
+              onClick={() => setEditing(true)}
+              variant="outline"
+              className="border-green-200 text-green-700 hover:bg-green-50"
+            >
+              Editar perfil
+            </Button>
+          </div>
         )}
       </div>
 
       {/* Avatar */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <div className="flex items-center gap-5">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-3xl font-bold">
-              {corretor?.nome?.charAt(0) || 'C'}
+          <div className="relative flex-shrink-0">
+            {/* Foto ou iniciais — enquadrada como logo, preservando a proporção */}
+            <div className="w-20 h-20 rounded-2xl overflow-hidden bg-white border border-gray-100 flex items-center justify-center text-green-700 text-3xl font-bold ring-2 ring-white shadow-sm">
+              {photoUrl ? (
+                <img
+                  src={photoUrl}
+                  alt="Foto de perfil"
+                  className="w-full h-full object-contain"
+                  onError={() => setPhotoUrl(null)}
+                />
+              ) : (
+                <span className="w-full h-full bg-green-100 flex items-center justify-center">
+                  {corretor?.nome?.charAt(0) || 'C'}
+                </span>
+              )}
             </div>
-            {editing && (
-              <button className="absolute -bottom-1 -right-1 w-7 h-7 bg-green-700 rounded-full flex items-center justify-center text-white shadow-md hover:bg-green-800">
+
+            {/* Spinner durante upload */}
+            {uploadingPhoto && (
+              <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+                <Loader2 className="w-5 h-5 text-white animate-spin" />
+              </div>
+            )}
+
+            {/* Botão câmera (modo edição) */}
+            {editing && !uploadingPhoto && (
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                className="absolute -bottom-1 -right-1 w-7 h-7 bg-green-700 rounded-full flex items-center justify-center text-white shadow-md hover:bg-green-800 transition-colors"
+                title="Alterar foto"
+              >
                 <Camera className="w-3.5 h-3.5" />
               </button>
             )}
+
+            {/* Input file oculto */}
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handlePhotoSelect}
+            />
           </div>
+
           <div>
             <h2 className="text-xl font-bold text-gray-900">{corretor?.nome}</h2>
             <p className="text-gray-500 text-sm">{corretor?.creci}</p>
@@ -178,7 +310,7 @@ export function CorretorPerfil() {
                   className="mt-1 flex h-10 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-400 text-gray-700"
                 >
                   <option value="">Selecione...</option>
-                  {mockImobiliarias.map((i) => (
+                  {imobiliarias.map((i) => (
                     <option key={i.id} value={i.id}>{i.nome}</option>
                   ))}
                 </select>
@@ -227,27 +359,89 @@ export function CorretorPerfil() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {[
-              { icon: User, label: 'Nome', value: corretor?.nome },
-              { icon: User, label: 'CPF', value: corretor?.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') },
-              { icon: User, label: 'CRECI', value: corretor?.creci },
-              { icon: Mail, label: 'E-mail', value: corretor?.email },
-              { icon: Phone, label: 'Telefone', value: corretor?.telefone },
-              { icon: MessageCircle, label: 'WhatsApp', value: corretor?.whatsapp },
-              { icon: Instagram, label: 'Instagram', value: corretor?.instagram || '—' },
-              { icon: Building2, label: 'Imobiliária', value: imobiliaria?.nome || '—' },
-              { icon: MapPin, label: 'Cidade/UF', value: `${corretor?.cidade}/${corretor?.uf}` },
+              { icon: User,          label: 'Nome',       value: corretor?.nome },
+              { icon: User,          label: 'CPF',        value: corretor?.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') },
+              { icon: User,          label: 'CRECI',      value: corretor?.creci },
+              { icon: Mail,          label: 'E-mail',     value: corretor?.email,    href: corretor?.email ? `mailto:${corretor.email}` : undefined },
+              { icon: Phone,         label: 'Telefone',   value: corretor?.telefone, href: corretor?.telefone ? `tel:+55${corretor.telefone.replace(/\D/g, '')}` : undefined },
+              { icon: MessageCircle, label: 'WhatsApp',   value: corretor?.whatsapp, href: corretor?.whatsapp ? `https://wa.me/55${corretor.whatsapp.replace(/\D/g, '')}` : undefined, external: true },
+              { icon: Instagram,     label: 'Instagram',  value: corretor?.instagram || '—' },
+              { icon: Building2,     label: 'Imobiliária',value: imobiliaria?.nome || '—' },
+              { icon: MapPin,        label: 'Cidade/UF',  value: `${corretor?.cidade}/${corretor?.uf}` },
             ].map((item) => (
               <div key={item.label} className="flex items-start gap-3">
                 <item.icon className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-xs text-gray-400 font-medium">{item.label}</p>
-                  <p className="text-sm text-gray-900 mt-0.5">{item.value}</p>
+                  {item.href ? (
+                    <a
+                      href={item.href}
+                      target={item.external ? '_blank' : undefined}
+                      rel={item.external ? 'noreferrer' : undefined}
+                      className="text-sm text-gray-900 mt-0.5 hover:text-green-700 hover:underline transition-colors"
+                    >
+                      {item.value}
+                    </a>
+                  ) : (
+                    <p className="text-sm text-gray-900 mt-0.5">{item.value}</p>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Notificações por WhatsApp (consentimento LGPD) */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
+              <MessageCircle className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Notificações por WhatsApp</p>
+              <p className="text-xs text-gray-500 mt-0.5 max-w-md">
+                Receba avisos de novos eventos, confirmação de inscrição (com QR Code) e
+                lembretes. Você pode ativar ou desativar quando quiser.
+              </p>
+            </div>
+          </div>
+
+          {/* Switch */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={optIn}
+            onClick={handleToggleOptIn}
+            disabled={savingOptIn}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-60 ${
+              optIn ? 'bg-green-600' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                optIn ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+        <p className={`text-xs font-medium mt-3 ${optIn ? 'text-green-600' : 'text-gray-400'}`}>
+          {savingOptIn ? 'Salvando…' : optIn ? '✓ Notificações ativadas' : 'Notificações desativadas'}
+        </p>
+      </div>
+
+      <TrocarSenhaModal open={senhaModalOpen} onClose={() => setSenhaModalOpen(false)} />
+
+      <ImageCropModal
+        open={!!cropSrc}
+        imageSrc={cropSrc}
+        aspect={1}
+        cropShape="round"
+        title="Ajustar foto de perfil"
+        onCancel={() => setCropSrc(null)}
+        onConfirm={handleCropConfirm}
+      />
     </div>
   )
 }

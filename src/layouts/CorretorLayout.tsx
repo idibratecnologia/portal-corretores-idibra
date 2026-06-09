@@ -35,6 +35,7 @@ function CorretorTopbar() {
 
 export function CorretorLayout() {
   const { role } = useAuth()
+  const location = useLocation()
 
   if (role !== 'corretor') {
     return <Navigate to="/login" replace />
@@ -46,7 +47,8 @@ export function CorretorLayout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <CorretorTopbar />
         <main className="flex-1 overflow-y-auto">
-          <div className="p-5 lg:p-7 page-enter">
+          {/* key por rota → reexecuta a animação de entrada a cada navegação */}
+          <div key={location.pathname} className="p-5 lg:p-7 page-enter">
             <Outlet />
           </div>
         </main>

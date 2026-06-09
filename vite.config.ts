@@ -17,4 +17,16 @@ export default defineConfig({
     port: 5173,
     https: useHttps,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Separa libs pesadas em chunks próprios (carregados sob demanda)
+        manualChunks: {
+          react:   ['react', 'react-dom', 'react-router-dom'],
+          charts:  ['recharts'],
+          qr:      ['html5-qrcode', 'jsqr', 'qrcode.react'],
+        },
+      },
+    },
+  },
 })

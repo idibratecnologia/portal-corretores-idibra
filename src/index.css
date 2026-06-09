@@ -78,10 +78,15 @@
 
 /* Smooth page transitions */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(12px) scale(0.995); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-.page-enter { animation: fadeUp 0.25s ease forwards; }
+.page-enter { animation: fadeUp 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Respeita quem prefere menos animação (acessibilidade) */
+@media (prefers-reduced-motion: reduce) {
+  .page-enter { animation: none; }
+}
 
 /* Admin topbar shadow */
 .topbar-shadow { box-shadow: 0 1px 0 #f0f0f0, 0 2px 8px rgba(0,0,0,0.04); }

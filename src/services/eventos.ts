@@ -1,42 +1,110 @@
+import { api } from '@/lib/api'
+import type { Paginated } from '@/lib/api'
 import { mockEventos } from '@/data/mockData'
 import type { Evento } from '@/types'
 
-// swap: import { supabase } from '@/lib/supabase'
+const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
-export async function fetchEventos(): Promise<Evento[]> {
-  // swap: const { data } = await supabase
-  //         .from('eventos')
-  //         .select('*')
-  //         .order('data_evento', { ascending: false })
-  //       return data ?? []
-  return mockEventos
+// ─── Types ───────────────────────────────────────────────────────
+
+export interface EventoFilters {
+  search?:  string
+  status?:  Evento['status'] | ''
+  tipo?:    string
+  page?:    number
+  limit?:   number
+  sort?:    string
+  order?:   'asc' | 'desc'
 }
 
-export async function fetchEventoById(id: string): Promise<Evento | null> {
-  // swap: const { data } = await supabase
-  //         .from('eventos')
-  //         .select('*')
-  //         .eq('id', id)
-  //         .single()
-  //       return data
-  return mockEventos.find((e) => e.id === id) ?? null
+// ─── Listagem ────────────────────────────────────────────────────
+
+export async function fetchEventos(
+  filters: EventoFilters = {},
+): Promise<Paginated<Evento>> {
+  if (USE_MOCK) {
+    const { search = '', status, tipo, page = 1, limit = 10 } = filters
+    const filtered = mockEventos.filter((e) => {
+      const q = search.toLowerCase()
+      return (
+        (!q || e.titulo.toLowerCase().includes(q) || e.local.toLowerCase().includes(q)) &&
+        (!status || e.status === status) &&
+        (!tipo || e.tipo === tipo)
+      )
+    })
+    const total = filtered.length
+    const data  = filtered.slice((page - 1) * limit, page * limit)
+    return { data, meta: { total, page, limit, pages: Math.ceil(total / limit) } }
+  }
+
+  return api.get<Paginated<Evento>>('/eventos', filters as Record<string, string>)
 }
+
+/** Apenas eventos publicados + inscrições abertas (visão do corretor) */
+export async function fetchEventosPublicados(): Promise<Evento[]> {
+  if (USE_MOCK) {
+    return mockEventos.filter((e) => e.status === 'publicado' && e.inscricoes_abertas)
+  }
+
+  const res = await api.get<Paginated<Evento>>('/eventos', { status: 'publicado', limit: 100 })
+  return res.data
+}
+
+export async function fetchEventoById(id: string): Promise<Evento> {
+  if (USE_MOCK) {
+    const e = mockEventos.find((e) => e.id === id)
+    if (!e) throw new Error('Evento não encontrado')
+    return e
+  }
+
+  return api.get<Evento>(`/eventos/${id}`)
+}
+
+// ─── Mutações ────────────────────────────────────────────────────
 
 export async function createEvento(
-  data: Omit<Evento, 'id' | 'created_at' | 'updated_at' | 'total_inscritos' | 'total_presentes'>
+  data: Omit<Evento, 'id' | 'created_at' | 'updated_at' | 'total_inscritos' | 'total_presentes' | 'status'>,
 ): Promise<Evento> {
-  // swap: const { data: novo } = await supabase.from('eventos').insert(data).select().single()
-  //       return novo
-  const now = new Date().toISOString()
-  return { ...data, id: String(Date.now()), created_at: now, updated_at: now, total_inscritos: 0, total_presentes: 0 }
+  if (USE_MOCK) {
+    const now = new Date().toISOString()
+    return { ...data, id: String(Date.now()), status: 'rascunho', total_inscritos: 0, total_presentes: 0, created_at: now, updated_at: now }
+  }
+
+  return api.post<Evento>('/eventos', data)
 }
 
-export async function updateEvento(id: string, data: Partial<Evento>): Promise<void> {
-  // swap: await supabase.from('eventos').update(data).eq('id', id)
-  console.log('[mock] updateEvento', id, data)
+export async function updateEvento(id: string, data: Partial<Evento>): Promise<Evento> {
+  if (USE_MOCK) {
+    console.log('[mock] updateEvento', id, data)
+    const e = mockEventos.find((e) => e.id === id)!
+    return { ...e, ...data }
+  }
+
+  return api.patch<Evento>(`/eventos/${id}`, data)
 }
 
-export async function setEventoStatus(id: string, status: Evento['status']): Promise<void> {
-  // swap: await supabase.from('eventos').update({ status }).eq('id', id)
-  console.log('[mock] setEventoStatus', id, status)
+export async function setEventoStatus(
+  id: string,
+  status: Evento['status'],
+): Promise<void> {
+  if (USE_MOCK) {
+    console.log('[mock] setEventoStatus', id, status)
+    return
+  }
+
+  await api.patch(`/eventos/${id}/status`, { status })
+}
+
+/** Upload de banner do evento */
+export async function uploadBannerEvento(
+  id: string,
+  file: File,
+): Promise<{ banner_url: string }> {
+  if (USE_MOCK) {
+    return { banner_url: URL.createObjectURL(file) }
+  }
+
+  const form = new FormData()
+  form.append('banner', file)
+  return api.upload<{ banner_url: string }>(`/eventos/${id}/banner`, form)
 }

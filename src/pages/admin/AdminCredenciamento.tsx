@@ -4,12 +4,13 @@ import {
   ArrowLeft, Search, CheckCircle2, Printer, Users, Clock,
   Maximize2, Minimize2, X,
 } from 'lucide-react'
-import { mockEventos, mockInscricoes, mockCorretoresComImobiliaria } from '@/data/mockData'
+import { fetchEventoById } from '@/services/eventos'
+import { fetchInscricoesByEvento, realizarCheckin } from '@/services/inscricoes'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatDate } from '@/lib/utils'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { cn } from '@/lib/utils'
-import type { EventoInscricao } from '@/types'
+import type { Evento, EventoInscricao } from '@/types'
 
 interface RecentEntry {
   key: string
@@ -29,20 +30,14 @@ export function AdminCredenciamento() {
   const navigate = useNavigate()
   const { role } = useAuth()
 
-  const evento = mockEventos.find((e) => e.id === id)
-
-  const [inscricoes, setInscricoes] = useState<EventoInscricao[]>(() =>
-    mockInscricoes
-      .filter((i) => i.evento_id === id)
-      .map((i) => ({
-        ...i,
-        corretor: mockCorretoresComImobiliaria.find((c) => c.id === i.corretor_id),
-      })) as EventoInscricao[]
-  )
+  const [evento, setEvento] = useState<Evento | null>(null)
+  const [eventoLoading, setEventoLoading] = useState(true)
+  const [inscricoes, setInscricoes] = useState<EventoInscricao[]>([])
 
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 200)
   const [printTarget, setPrintTarget] = useState<EventoInscricao | null>(null)
+  const [flash, setFlash] = useState<{ nome: string; imobiliaria: string } | null>(null)
   const [recentEntries, setRecentEntries] = useState<RecentEntry[]>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -50,6 +45,22 @@ export function AdminCredenciamento() {
   useEffect(() => {
     if (role !== 'admin') navigate('/login', { replace: true })
   }, [role, navigate])
+
+  // Carrega evento + inscrições da API
+  const loadData = useCallback(async () => {
+    if (!id) return
+    try {
+      const [ev, ins] = await Promise.all([fetchEventoById(id), fetchInscricoesByEvento(id)])
+      setEvento(ev)
+      setInscricoes(ins)
+    } catch {
+      setEvento(null)
+    } finally {
+      setEventoLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => { loadData() }, [loadData])
 
   useEffect(() => {
     searchRef.current?.focus()
@@ -85,10 +96,16 @@ export function AdminCredenciamento() {
       })
     : allActive
 
-  const handleConfirmar = useCallback((inscricao: EventoInscricao) => {
+  const handleConfirmar = useCallback(async (inscricao: EventoInscricao) => {
     let target = inscricao
 
+    // Se ainda não está presente, registra o check-in na API
     if (inscricao.status !== 'presente') {
+      const result = await realizarCheckin(inscricao.qr_code_token)
+      if (!result.ok && result.erro !== 'Check-in já realizado') {
+        // erro real — aborta sem imprimir
+        return
+      }
       target = { ...inscricao, status: 'presente' as const, checkin_at: new Date().toISOString() }
       setInscricoes((prev) => prev.map((i) => (i.id === inscricao.id ? target : i)))
       setRecentEntries((prev) => [
@@ -103,12 +120,19 @@ export function AdminCredenciamento() {
       ])
     }
 
-    setPrintTarget(target)
     setSearch('')
+    setFlash({
+      nome: target.corretor?.nome ?? '—',
+      imobiliaria: target.corretor?.imobiliaria?.nome ?? '',
+    })
     setTimeout(() => {
-      window.print()
-      setTimeout(() => searchRef.current?.focus(), 400)
-    }, 120)
+      setFlash(null)
+      setPrintTarget(target)
+      setTimeout(() => {
+        window.print()
+        setTimeout(() => searchRef.current?.focus(), 400)
+      }, 100)
+    }, 1800)
   }, [])
 
   const toggleFullscreen = () => {
@@ -117,6 +141,18 @@ export function AdminCredenciamento() {
     } else {
       document.exitFullscreen().catch(() => {})
     }
+  }
+
+  if (eventoLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-950 text-white">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-bounce [animation-delay:-0.3s]" />
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-bounce [animation-delay:-0.15s]" />
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-bounce" />
+        </div>
+      </div>
+    )
   }
 
   if (!evento) {
@@ -204,6 +240,25 @@ export function AdminCredenciamento() {
             )}
             <div className="crachá-div" />
             <div className="crachá-tag">✓ PRESENÇA CONFIRMADA</div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Flash feedback overlay ─── */}
+      {flash && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-green-950/98">
+          <div className="w-28 h-28 rounded-full bg-green-500 shadow-2xl shadow-green-500/40 flex items-center justify-center">
+            <CheckCircle2 className="w-16 h-16 text-white" strokeWidth={1.5} />
+          </div>
+          <div className="text-center px-8">
+            <p className="text-4xl sm:text-5xl font-black text-white leading-tight">{flash.nome}</p>
+            {flash.imobiliaria && (
+              <p className="text-green-300 text-lg mt-2">{flash.imobiliaria}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 bg-green-900/60 border border-green-700 rounded-full px-5 py-2">
+            <CheckCircle2 className="w-4 h-4 text-green-400" />
+            <span className="text-sm font-bold text-green-300">Presença confirmada — imprimindo...</span>
           </div>
         </div>
       )}

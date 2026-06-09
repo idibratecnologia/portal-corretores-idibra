@@ -1,73 +1,141 @@
+import { api, apiBaseUrl, getToken } from '@/lib/api'
 import { mockInscricoes, mockInscricoesCorretorLogado } from '@/data/mockData'
 import type { EventoInscricao, StatusInscricao } from '@/types'
 
-// swap: import { supabase } from '@/lib/supabase'
+const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
-export async function fetchInscricoesByEvento(eventoId: string): Promise<EventoInscricao[]> {
-  // swap: const { data } = await supabase
-  //         .from('inscricoes')
-  //         .select('*, corretor:corretores(*, imobiliaria:imobiliarias(*))')
-  //         .eq('evento_id', eventoId)
-  //       return data ?? []
-  return mockInscricoes.filter((i) => i.evento_id === eventoId)
+// ─── Listagem ────────────────────────────────────────────────────
+
+export async function fetchInscricoesByEvento(
+  eventoId: string,
+): Promise<EventoInscricao[]> {
+  if (USE_MOCK) {
+    return mockInscricoes.filter((i) => i.evento_id === eventoId) as EventoInscricao[]
+  }
+
+  return api.get<EventoInscricao[]>(`/inscricoes?evento_id=${eventoId}`)
 }
 
-export async function fetchInscricoesByCorretor(corretorId: string): Promise<EventoInscricao[]> {
-  // swap: const { data } = await supabase
-  //         .from('inscricoes')
-  //         .select('*, evento:eventos(*)')
-  //         .eq('corretor_id', corretorId)
-  //         .order('created_at', { ascending: false })
-  //       return data ?? []
-  return mockInscricoesCorretorLogado.filter((i) => i.corretor_id === corretorId)
+export async function fetchInscricoesByCorretor(
+  corretorId: string,
+): Promise<EventoInscricao[]> {
+  if (USE_MOCK) {
+    return mockInscricoesCorretorLogado.filter((i) => i.corretor_id === corretorId)
+  }
+
+  return api.get<EventoInscricao[]>(`/inscricoes?corretor_id=${corretorId}`)
 }
+
+/** Inscrições do corretor logado (usa rota autenticada /inscricoes/me) */
+export async function fetchMinhasInscricoes(): Promise<EventoInscricao[]> {
+  if (USE_MOCK) {
+    return mockInscricoesCorretorLogado
+  }
+
+  return api.get<EventoInscricao[]>('/inscricoes/me')
+}
+
+// ─── Mutações ────────────────────────────────────────────────────
 
 export async function createInscricao(
   eventoId: string,
-  corretorId: string
 ): Promise<EventoInscricao> {
-  // swap: const { data } = await supabase
-  //         .from('inscricoes')
-  //         .insert({ evento_id: eventoId, corretor_id: corretorId, status: 'inscrito' })
-  //         .select()
-  //         .single()
-  //       return data
-  return {
-    id: String(Date.now()),
-    evento_id: eventoId,
-    corretor_id: corretorId,
-    status: 'inscrito',
-    qr_code_token: `TOKEN-${Date.now()}`,
-    created_at: new Date().toISOString(),
+  if (USE_MOCK) {
+    return {
+      id:            String(Date.now()),
+      evento_id:     eventoId,
+      corretor_id:   '1',
+      status:        'inscrito',
+      qr_code_token: `TOKEN-${Date.now()}`,
+      created_at:    new Date().toISOString(),
+    }
   }
+
+  return api.post<EventoInscricao>('/inscricoes', { evento_id: eventoId })
 }
 
 export async function cancelarInscricao(inscricaoId: string): Promise<void> {
-  // swap: await supabase.from('inscricoes').update({ status: 'cancelado' }).eq('id', inscricaoId)
-  console.log('[mock] cancelarInscricao', inscricaoId)
+  if (USE_MOCK) {
+    console.log('[mock] cancelarInscricao', inscricaoId)
+    return
+  }
+
+  await api.patch(`/inscricoes/${inscricaoId}/cancelar`, {})
 }
 
-export async function realizarCheckin(
-  token: string,
-  checkinPor?: string
-): Promise<{ ok: boolean; inscricao?: EventoInscricao; erro?: string }> {
-  // swap: const { data: inscricao } = await supabase
-  //         .from('inscricoes')
-  //         .select('*, corretor:corretores(*, imobiliaria:imobiliarias(*))')
-  //         .eq('qr_code_token', token)
-  //         .single()
-  //       if (!inscricao) return { ok: false, erro: 'Token não encontrado' }
-  //       if (inscricao.status === 'presente') return { ok: false, erro: 'Já registrado', inscricao }
-  //       if (inscricao.status === 'cancelado') return { ok: false, erro: 'Inscrição cancelada' }
-  //       await supabase.from('inscricoes').update({
-  //         status: 'presente',
-  //         checkin_at: new Date().toISOString(),
-  //         checkin_por: checkinPor,
-  //       }).eq('id', inscricao.id)
-  //       return { ok: true, inscricao }
-  const inscricao = mockInscricoes.find((i) => i.qr_code_token === token)
-  if (!inscricao) return { ok: false, erro: 'Token não encontrado' }
-  if (inscricao.status === 'presente') return { ok: false, erro: 'Já registrado', inscricao: inscricao as EventoInscricao }
-  if (inscricao.status === 'cancelado') return { ok: false, erro: 'Inscrição cancelada' }
-  return { ok: true, inscricao: { ...inscricao, status: 'presente' as StatusInscricao, checkin_at: new Date().toISOString(), checkin_por: checkinPor } }
+/** Admin marca presença/ausência manualmente. */
+export async function setInscricaoStatus(
+  inscricaoId: string,
+  status: 'presente' | 'ausente' | 'cancelado',
+): Promise<EventoInscricao> {
+  if (USE_MOCK) {
+    console.log('[mock] setInscricaoStatus', inscricaoId, status)
+    return { id: inscricaoId, evento_id: '', corretor_id: '', status, qr_code_token: '', created_at: new Date().toISOString() }
+  }
+
+  return api.patch<EventoInscricao>(`/inscricoes/${inscricaoId}/status`, { status })
+}
+
+/** Admin baixa a lista de presença do evento em CSV (Excel). */
+export async function exportarPresencaCsv(eventoId: string, nomeEvento?: string): Promise<void> {
+  if (USE_MOCK) {
+    console.log('[mock] exportarPresencaCsv', eventoId)
+    return
+  }
+
+  const res = await fetch(`${apiBaseUrl}/inscricoes/export?evento_id=${eventoId}`, {
+    headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+  })
+  if (!res.ok) throw new Error('Não foi possível exportar a lista de presença.')
+
+  const blob = await res.blob()
+  const slug = (nomeEvento || 'evento')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase().slice(0, 40) || 'evento'
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `presenca-${slug}.csv`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+/** Admin reenvia o QR de check-in pelo WhatsApp do corretor. */
+export async function reenviarQrInscricao(inscricaoId: string): Promise<void> {
+  if (USE_MOCK) {
+    console.log('[mock] reenviarQrInscricao', inscricaoId)
+    return
+  }
+
+  await api.post(`/inscricoes/${inscricaoId}/reenviar-qr`, {})
+}
+
+// ─── Check-in ────────────────────────────────────────────────────
+
+export interface CheckinResult {
+  ok:        boolean
+  inscricao?: EventoInscricao
+  erro?:     string
+}
+
+/** Check-in via token do QR Code */
+export async function realizarCheckin(token: string): Promise<CheckinResult> {
+  if (USE_MOCK) {
+    const inscricao = mockInscricoes.find((i) => i.qr_code_token === token)
+    if (!inscricao)              return { ok: false, erro: 'Token não encontrado' }
+    if (inscricao.status === 'presente')  return { ok: false, erro: 'Já registrado', inscricao: inscricao as EventoInscricao }
+    if (inscricao.status === 'cancelado') return { ok: false, erro: 'Inscrição cancelada' }
+    return {
+      ok: true,
+      inscricao: {
+        ...inscricao,
+        status:     'presente' as StatusInscricao,
+        checkin_at: new Date().toISOString(),
+      } as EventoInscricao,
+    }
+  }
+
+  return api.post<CheckinResult>('/inscricoes/checkin', { qr_token: token })
 }

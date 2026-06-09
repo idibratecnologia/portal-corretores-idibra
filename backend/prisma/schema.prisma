@@ -1,0 +1,240 @@
+// ─────────────────────────────────────────────────────────────────
+// Prisma Schema — Portal de Corretores IDIBRA
+// Documentação: https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference
+// ─────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────
+
+enum StatusCorretor {
+  pendente   // Aguardando aprovação do admin
+  ativo      // Aprovado e ativo
+  bloqueado  // Bloqueado pelo admin
+}
+
+enum StatusImobiliaria {
+  ativa
+  inativa
+}
+
+enum StatusEvento {
+  rascunho   // Criado mas não visível para corretores
+  publicado  // Visível e com inscrições abertas (se inscricoes_abertas=true)
+  encerrado  // Finalizado — não aceita mais inscrições
+  cancelado  // Cancelado — inscrições são notificadas via WhatsApp
+}
+
+enum StatusInscricao {
+  inscrito   // Inscrição confirmada, aguardando o evento
+  presente   // Check-in realizado
+  ausente    // Não compareceu (marcado manualmente pelo admin)
+  cancelado  // Inscrição cancelada pelo corretor ou admin
+}
+
+enum TipoEvento {
+  lancamento   // Lançamento de imóvel
+  treinamento  // Capacitação / curso
+  reuniao      // Reunião de parceiros
+  feira        // Feira imobiliária
+  workshop     // Workshop / oficina
+  outro
+}
+
+// ─── Admin ────────────────────────────────────────────────────────
+
+model Admin {
+  id         String   @id @default(uuid())
+  nome       String
+  email      String   @unique
+  senha      String   // Armazenado como bcrypt hash (salt rounds: 12)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("admins")
+}
+
+// ─── Imobiliária ─────────────────────────────────────────────────
+
+model Imobiliaria {
+  id         String            @id @default(uuid())
+  nome       String
+  cnpj       String            @unique @db.VarChar(18) // formatado: 00.000.000/0001-00
+  telefone   String?
+  email      String?
+  cidade     String
+  uf         String            @db.Char(2)
+  logo_url   String?
+  status     StatusImobiliaria @default(ativa)
+  created_at DateTime          @default(now())
+  updated_at DateTime          @updatedAt
+
+  corretores Corretor[]
+
+  @@map("imobiliarias")
+}
+
+// ─── Corretor ────────────────────────────────────────────────────
+
+model Corretor {
+  id                String         @id @default(uuid())
+  nome              String
+  cpf               String         @unique @db.VarChar(14)  // formatado: 000.000.000-00
+  creci             String         @unique
+  email             String         @unique
+  senha             String         // bcrypt hash — definida no cadastro ou gerada e enviada por WhatsApp
+  telefone          String
+  whatsapp          String
+  whatsapp_opt_in   Boolean        @default(false)   // LGPD: consentiu receber notificações
+  instagram         String?
+  cidade            String
+  uf                String         @db.Char(2)
+  status            StatusCorretor @default(pendente)
+  foto_url          String?        // Caminho relativo: /uploads/fotos/{uuid}.webp
+  observacoes_admin String?        // Visível apenas para admins
+
+  imobiliaria_id    String?
+  imobiliaria       Imobiliaria?   @relation(fields: [imobiliaria_id], references: [id], onDelete: SetNull)
+
+  inscricoes        Inscricao[]
+  notificacoes      NotificacaoLog[]
+
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @updatedAt
+
+  @@index([status])
+  @@index([imobiliaria_id])
+  @@map("corretores")
+}
+
+// ─── Evento ──────────────────────────────────────────────────────
+
+model Evento {
+  id                 String       @id @default(uuid())
+  titulo             String
+  descricao          String
+  tipo               TipoEvento
+  empreendimento     String?      // Empreendimento vinculado ao lançamento
+  local              String       // Nome do local (ex: "Sede IDIBRA")
+  endereco           String       // Endereço completo
+  link_maps          String?      // Link do Google Maps
+  data_evento        DateTime     // Data e hora de início
+  hora_inicio        String       @db.VarChar(5)  // "09:00"
+  hora_fim           String       @db.VarChar(5)  // "18:00"
+  capacidade         Int          // Número máximo de participantes
+  banner_url         String?      // Caminho relativo: /uploads/banners/{uuid}.webp
+  status             StatusEvento @default(rascunho)
+  inscricoes_abertas Boolean      @default(true)
+
+  inscricoes         Inscricao[]
+  notificacoes       NotificacaoLog[]
+
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+
+  @@index([status])
+  @@index([data_evento])
+  @@map("eventos")
+}
+
+// ─── Inscrição ───────────────────────────────────────────────────
+
+model Inscricao {
+  id             String          @id @default(uuid())
+  status         StatusInscricao @default(inscrito)
+  qr_code_token  String          @unique @default(uuid()) // UUID usado para gerar o QR Code
+  checkin_at     DateTime?       // Timestamp do check-in
+  checkin_por    String?         // ID do admin que realizou o check-in (auditoria)
+
+  corretor_id    String
+  evento_id      String
+  corretor       Corretor        @relation(fields: [corretor_id], references: [id], onDelete: Cascade)
+  evento         Evento          @relation(fields: [evento_id], references: [id], onDelete: Cascade)
+
+  created_at     DateTime        @default(now())
+
+  // Um corretor não pode se inscrever duas vezes no mesmo evento
+  @@unique([corretor_id, evento_id])
+  @@index([evento_id])
+  @@index([status])
+  @@map("inscricoes")
+}
+
+// ─── Log de Notificações WhatsApp ────────────────────────────────
+
+model NotificacaoLog {
+  id          String    @id @default(uuid())
+
+  // Tipo do disparo para auditoria e controle de duplicatas
+  // Valores: inscricao_confirmada | lembrete_d1 | lembrete_d0 |
+  //          aprovacao | checkin | cancelamento_evento
+  tipo        String
+
+  status      String    // enviado | erro
+  mensagem    String?   // Texto enviado (auditoria e reenvio)
+  erro        String?   // Mensagem de erro se o disparo falhou
+
+  corretor_id String
+  evento_id   String?
+  corretor    Corretor  @relation(fields: [corretor_id], references: [id], onDelete: Cascade)
+  evento      Evento?   @relation(fields: [evento_id], references: [id], onDelete: SetNull)
+
+  enviado_at  DateTime  @default(now())
+
+  @@index([corretor_id])
+  @@index([tipo, status])
+  @@map("notificacoes_log")
+}
+
+// ─── Configurações do Sistema (linha única / singleton) ──────────
+
+model Configuracao {
+  id               String   @id @default("singleton")
+  empresa_nome     String   @default("IDIBRA")
+  empresa_email    String   @default("")
+  empresa_telefone String   @default("")
+  empresa_site     String   @default("")
+  auto_approve     Boolean  @default(false)  // aprovar corretores automaticamente
+  notify_inscricao Boolean  @default(true)   // notificar inscrição
+  allow_cancel     Boolean  @default(true)   // permitir cancelamento pelo corretor
+  updated_at       DateTime @updatedAt @default(now())
+
+  @@map("configuracoes")
+}
+
+// ─── Templates de Mensagens (Central de Notificações) ────────────
+
+model MensagemTemplate {
+  id                String   @id @default(uuid())
+  tipo              String   @unique  // evento_novo | lembrete_antecedencia | lembrete_dia | inscricao_confirmada | aprovacao | checkin | cancelamento_evento
+  titulo            String              // nome amigável exibido no admin
+  descricao         String              // quando dispara
+  conteudo          String              // texto com {{placeholders}}
+  ativo             Boolean  @default(true)
+  com_imagem        Boolean  @default(false) // envia o banner do evento junto (quando aplicável)
+  dias_antecedencia Int?                // usado apenas em lembrete_antecedencia
+  updated_at        DateTime @updatedAt @default(now())
+
+  @@map("mensagem_templates")
+}
+
+// ─── Reset de Senha ──────────────────────────────────────────────
+
+model PasswordReset {
+  id         String   @id @default(uuid())
+  email      String   // e-mail do admin ou corretor (login é unificado)
+  token      String   @unique
+  expires_at DateTime
+  used       Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([email])
+  @@map("password_resets")
+}

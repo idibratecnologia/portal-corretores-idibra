@@ -1,0 +1,68 @@
+# Ambiente de infraestrutura do backend IDIBRA.
+#
+# Uso:
+#   docker compose up -d         → sobe PostgreSQL (e Evolution API quando habilitado)
+#   docker compose down          → para os serviços (dados persistem nos volumes)
+#   docker compose down -v       → para e APAGA os dados
+#
+# Após subir: cd backend && npm run db:migrate:dev && npm run db:seed && npm run dev
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: idibra-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: idibra
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-SuaSenha}
+      POSTGRES_DB: idibra_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - idibra_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U idibra -d idibra_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Evolution API (WhatsApp) — Bloco 4.
+  # Exposto só em localhost por segurança. A sessão do WhatsApp persiste no
+  # volume `evolution_instances` — fica sincronizado entre reinícios.
+  #
+  # Pré-requisito: criar o banco do Evolution uma vez:
+  #   docker exec idibra-pg psql -U idibra -d idibra_db -c "CREATE DATABASE evolution OWNER idibra"
+  evolution:
+    image: atendai/evolution-api:v2.1.1
+    container_name: idibra-evolution
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SERVER_URL: http://localhost:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-troque-esta-chave-forte}
+      # Versão atual do WhatsApp Web (Baileys). Sem isto, o WhatsApp recusa o
+      # handshake e o QR nunca é gerado. Atualize com a versão vigente:
+      #   curl https://raw.githubusercontent.com/WhiskeySockets/Baileys/master/src/Defaults/baileys-version.json
+      CONFIG_SESSION_PHONE_VERSION: ${EVOLUTION_WA_VERSION:-2.3000.1035194821}
+      # Banco (reusa o mesmo Postgres, base "evolution")
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://idibra:${POSTGRES_PASSWORD:-SuaSenha}@postgres:5432/evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      # Cache local (sem Redis)
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      # Não precisamos de webhooks por enquanto
+      WEBHOOK_GLOBAL_ENABLED: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+
+volumes:
+  idibra_pgdata:
+  evolution_instances:

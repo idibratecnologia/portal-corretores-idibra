@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import idibraLogo from '@/assets/idibra_logo.png'
+import idibraLogoPreta from '@/assets/idibra_logo_preta.png'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Lock, Mail, ArrowRight, CheckCircle, Building2, Users, Calendar, TrendingUp } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -99,8 +100,8 @@ export function LoginPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex items-center justify-center mb-8 lg:hidden">
-            <div className="bg-slate-900 rounded-2xl px-5 py-3">
-              <img src={idibraLogo} alt="IDIBRA" className="h-8 w-auto object-contain" />
+            <div className="bg-white rounded-2xl px-5 py-3 shadow-sm border border-gray-100">
+              <img src={idibraLogoPreta} alt="IDIBRA" className="h-8 w-auto object-contain" />
             </div>
           </div>
 

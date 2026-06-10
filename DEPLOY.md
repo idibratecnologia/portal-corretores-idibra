@@ -148,15 +148,16 @@ No painel do seu provedor de domínio, crie dois registros **A** apontando para 
 
 | Tipo | Nome | Valor |
 |---|---|---|
-| A | `portal` | `SEU_IP_DA_VPS` |
+| A | `@`   | `SEU_IP_DA_VPS` |
+| A | `www` | `SEU_IP_DA_VPS` |
 | A | `api` | `SEU_IP_DA_VPS` |
 
 Resultando em:
-- `portal.idibra.com.br` → frontend
-- `api.idibra.com.br` → backend
+- `corretoridibra.com.br` (e `www`) → frontend (portal)
+- `api.corretoridibra.com.br` → backend
 
 > A propagação do DNS pode levar de minutos a algumas horas. Confirme com:
-> `dig portal.idibra.com.br +short`
+> `dig corretoridibra.com.br +short` e `dig api.corretoridibra.com.br +short`
 
 ---
 
@@ -203,7 +204,7 @@ JWT_REFRESH_EXPIRES_IN=30d
 
 UPLOAD_DIR=/var/www/uploads
 UPLOAD_MAX_SIZE_MB=10
-API_URL=https://api.idibra.com.br
+API_URL=https://api.corretoridibra.com.br
 
 # Evolution — preencher no passo 8
 EVOLUTION_URL=http://localhost:8080
@@ -216,7 +217,7 @@ EVOLUTION_INSTANCE=idibra
 WHATSAPP_MIN_DELAY_MS=4000
 WHATSAPP_MAX_DELAY_MS=9000
 
-ALLOWED_ORIGINS=https://portal.idibra.com.br
+ALLOWED_ORIGINS=https://corretoridibra.com.br
 ```
 
 > **Disparos em massa** (broadcast de evento publicado, lembretes) passam por uma
@@ -294,7 +295,7 @@ nano .env.production
 
 Preencha:
 ```env
-VITE_API_URL=https://api.idibra.com.br
+VITE_API_URL=https://api.corretoridibra.com.br
 VITE_USE_MOCK=false
 ```
 
@@ -327,10 +328,10 @@ sudo nano /etc/nginx/sites-available/idibra
 Cole (ajuste os domínios se necessário):
 
 ```nginx
-# ── Frontend (portal.idibra.com.br) ──
+# ── Frontend (corretoridibra.com.br) ──
 server {
   listen 80;
-  server_name portal.idibra.com.br;
+  server_name corretoridibra.com.br www.corretoridibra.com.br;
   root /var/www/idibra/dist;
   index index.html;
 
@@ -342,10 +343,10 @@ server {
   gzip_types text/plain text/css application/javascript application/json image/svg+xml;
 }
 
-# ── API (api.idibra.com.br) ──
+# ── API (api.corretoridibra.com.br) ──
 server {
   listen 80;
-  server_name api.idibra.com.br;
+  server_name api.corretoridibra.com.br;
 
   client_max_body_size 10M;             # tamanho máximo de upload
 
@@ -397,13 +398,13 @@ sudo nginx -t                                   # testar config
 sudo systemctl reload nginx
 ```
 
-Neste ponto, `http://portal.idibra.com.br` já deve carregar.
+Neste ponto, `http://corretoridibra.com.br` já deve carregar.
 
 ### 7.3 Instalar SSL (HTTPS gratuito via Let's Encrypt)
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d portal.idibra.com.br -d api.idibra.com.br
+sudo certbot --nginx -d corretoridibra.com.br -d www.corretoridibra.com.br -d api.corretoridibra.com.br
 ```
 
 O Certbot:
@@ -416,7 +417,7 @@ Testar a renovação:
 sudo certbot renew --dry-run
 ```
 
-Pronto — `https://portal.idibra.com.br` e `https://api.idibra.com.br` no ar.
+Pronto — `https://corretoridibra.com.br` e `https://api.corretoridibra.com.br` no ar.
 
 ---
 
@@ -566,7 +567,7 @@ cd /var/www/idibra && npm install && npm run build
 | SSL não renova | Certbot timer parado | `sudo systemctl status certbot.timer` |
 | WhatsApp não envia | Instância desconectada | Reescanear QR; ver logs do container `docker logs evolution-api` |
 | Notificações não atualizam em tempo real | Nginx bufferizando o SSE | Conferir o bloco `location /notifications/stream` com `proxy_buffering off` (passo 7.1) e recarregar o Nginx |
-| Sino só atualiza ao recarregar / a cada 2 min | SSE caiu, usando só o polling de segurança | Testar `curl -N https://api.idibra.com.br/notifications/stream?token=...`; ver `proxy_read_timeout` |
+| Sino só atualiza ao recarregar / a cada 2 min | SSE caiu, usando só o polling de segurança | Testar `curl -N https://api.corretoridibra.com.br/notifications/stream?token=...`; ver `proxy_read_timeout` |
 | Mensagens de WhatsApp saindo muito devagar | Throttle alto na fila | Reduzir `WHATSAPP_MIN/MAX_DELAY_MS` (cuidado com bloqueio); acompanhar a fila em Configurações |
 | Imagem (banner/logo/foto) quebrada | Permissão ou caminho do upload | Conferir `/var/www/uploads/{banners,fotos,logos}` e o `alias` do Nginx |
 

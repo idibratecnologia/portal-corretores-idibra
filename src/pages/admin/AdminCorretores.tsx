@@ -237,8 +237,10 @@ export function AdminCorretores() {
                       <tr key={corretor.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
-                              {corretor.nome.charAt(0)}
+                            <div className="w-8 h-8 rounded-full overflow-hidden bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
+                              {corretor.foto_url ? (
+                                <img src={corretor.foto_url} alt={corretor.nome} className="w-full h-full object-cover" />
+                              ) : corretor.nome.charAt(0)}
                             </div>
                             <div>
                               <p className="font-medium text-gray-900">{corretor.nome}</p>

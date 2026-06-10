@@ -100,8 +100,10 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         <div className="bg-slate-700/40 rounded-2xl p-3 border border-slate-600/30">
           <div className="flex items-center gap-3 mb-3">
             <div className="relative flex-shrink-0">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-bold shadow">
-                {corretor?.nome.charAt(0) || 'C'}
+              <div className="w-9 h-9 rounded-xl overflow-hidden bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-bold shadow">
+                {corretor?.foto_url ? (
+                  <img src={corretor.foto_url} alt={corretor.nome} className="w-full h-full object-cover" />
+                ) : (corretor?.nome.charAt(0) || 'C')}
               </div>
               <span className={cn('absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-800', statusDot)} />
             </div>

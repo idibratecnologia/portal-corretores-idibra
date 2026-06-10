@@ -172,8 +172,12 @@ export function AdminCorretorPerfil() {
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <div className="flex flex-col sm:flex-row gap-6">
           <div className="flex-shrink-0">
-            <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-4xl font-bold select-none">
-              {corretor.nome.charAt(0)}
+            <div className="w-24 h-24 rounded-full overflow-hidden bg-green-100 flex items-center justify-center text-green-700 text-4xl font-bold select-none">
+              {corretor.foto_url ? (
+                <img src={corretor.foto_url} alt={corretor.nome} className="w-full h-full object-cover" />
+              ) : (
+                corretor.nome.charAt(0)
+              )}
             </div>
           </div>
           <div className="flex-1 space-y-1">

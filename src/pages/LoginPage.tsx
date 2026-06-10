@@ -2,7 +2,7 @@ import { useState } from 'react'
 import idibraLogo from '@/assets/idibra_logo.png'
 import idibraLogoPreta from '@/assets/idibra_logo_preta.png'
 import { useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Lock, Mail, ArrowRight, CheckCircle, Building2, Users, Calendar, TrendingUp } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail, ArrowRight, CheckCircle, Users, Calendar, TrendingUp } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const benefits = [
@@ -110,14 +110,9 @@ export function LoginPage() {
             <div className="h-1 bg-gradient-to-r from-green-600 via-emerald-400 to-green-500" />
             <div className="p-8">
             {/* Header */}
-            <div className="flex items-center gap-3 mb-7">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center shadow-sm">
-                <Building2 className="w-5 h-5 text-green-400" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-gray-900 leading-tight">Acessar plataforma</h2>
-                <p className="text-xs text-gray-400">Entre com suas credenciais</p>
-              </div>
+            <div className="mb-7">
+              <h2 className="text-lg font-bold text-gray-900 leading-tight">Acessar plataforma</h2>
+              <p className="text-xs text-gray-400">Entre com suas credenciais</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -194,22 +189,6 @@ export function LoginPage() {
                 )}
               </button>
             </form>
-
-            {/* Demo hint */}
-            <div className="mt-5 p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-1.5">
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Contas de demonstração</p>
-              <div className="space-y-1">
-                <p className="text-[11px] text-gray-500">
-                  <span className="font-mono font-semibold text-gray-700">admin@idibra.com.br</span>
-                  {' '}→ Administrador
-                </p>
-                <p className="text-[11px] text-gray-500">
-                  <span className="font-mono font-semibold text-gray-700">joao.silva@email.com</span>
-                  {' '}→ Corretor
-                </p>
-                <p className="text-[11px] text-gray-400">Senha: qualquer valor</p>
-              </div>
-            </div>
             </div>{/* end p-8 */}
           </div>
 

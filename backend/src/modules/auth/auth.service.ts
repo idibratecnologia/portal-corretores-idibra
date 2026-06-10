@@ -8,6 +8,7 @@ import { hashPassword, verifyPassword } from '@/lib/hash'
 import { signAccessToken, signRefreshToken, verifyToken } from '@/lib/jwt'
 import { UnauthorizedError, ConflictError, ForbiddenError, BadRequestError } from '@/lib/errors'
 import { notify } from '@/lib/notifications'
+import { emitAdminRefresh } from '@/lib/events'
 import { config } from '@/config'
 import { getRegras } from '@/modules/configuracoes/configuracoes.service'
 import type { LoginInput, CadastroInput } from './auth.schema'
@@ -99,6 +100,9 @@ export async function cadastrarCorretor(input: CadastroInput): Promise<{ id: str
     },
     select: { id: true },
   })
+
+  // Sinaliza aos admins conectados (SSE) que há um novo cadastro — tempo real.
+  emitAdminRefresh('corretor-cadastro')
 
   return corretor
 }

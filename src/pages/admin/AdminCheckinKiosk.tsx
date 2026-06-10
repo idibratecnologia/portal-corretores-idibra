@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, XCircle, Users, Maximize2, Minimize2, Clock, Search, QrCode, X, Radio } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, XCircle, Users, Maximize2, Minimize2, Clock, Search, QrCode, X, Radio, Printer } from 'lucide-react'
 import { QrScanner } from '@/components/shared/QrScanner'
+import { ComprovantePresenca } from '@/components/admin/ComprovantePresenca'
 import { fetchEventoById } from '@/services/eventos'
 import { realizarCheckin } from '@/services/inscricoes'
 import { useAuth } from '@/contexts/AuthContext'
@@ -22,6 +23,7 @@ interface RecentCheckin {
   nome: string
   imobiliaria: string
   at: string
+  inscricao: EventoInscricao
 }
 
 interface Feedback {
@@ -59,6 +61,8 @@ export function AdminCheckinKiosk() {
 
   const [recentCheckins, setRecentCheckins] = useState<RecentCheckin[]>([])
   const [feedback,     setFeedback]     = useState<Feedback | null>(null)
+  const [printTarget,  setPrintTarget]  = useState<EventoInscricao | null>(null)
+  const [lastInscricao, setLastInscricao] = useState<EventoInscricao | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [mode,         setMode]         = useState<KioskMode>('qr')
   const [search,       setSearch]       = useState('')
@@ -83,8 +87,15 @@ export function AdminCheckinKiosk() {
   const showFeedback = (fb: Feedback) => {
     setFeedback(fb)
     if (feedbackTimer.current) clearTimeout(feedbackTimer.current)
-    feedbackTimer.current = setTimeout(() => setFeedback(null), 3000)
+    // sucesso fica um pouco mais (tempo de imprimir o comprovante); erro some rápido
+    feedbackTimer.current = setTimeout(() => setFeedback(null), fb.ok ? 6000 : 3000)
   }
+
+  // Imprime o comprovante de presença de uma inscrição
+  const handlePrint = useCallback((inscricao: EventoInscricao) => {
+    setPrintTarget(inscricao)
+    setTimeout(() => window.print(), 60)
+  }, [])
 
   // Check-in via QR token — persiste na API e atualiza o painel
   const handleScan = useCallback(async (token: string) => {
@@ -99,10 +110,13 @@ export function AdminCheckinKiosk() {
     const imobiliaria  = result.inscricao?.corretor?.imobiliaria?.nome ?? ''
 
     applyCheckin(token)
-    setRecentCheckins((rc) => [
-      { key: `${result.inscricao?.id}-${Date.now()}`, nome, imobiliaria, at: new Date().toISOString() },
-      ...rc.slice(0, 19),
-    ])
+    if (result.inscricao) {
+      setLastInscricao(result.inscricao)
+      setRecentCheckins((rc) => [
+        { key: `${result.inscricao!.id}-${Date.now()}`, nome, imobiliaria, at: new Date().toISOString(), inscricao: result.inscricao! },
+        ...rc.slice(0, 19),
+      ])
+    }
     showFeedback({ ok: true, title: nome, subtitle: imobiliaria || 'Check-in confirmado!' })
   }, [applyCheckin])
 
@@ -126,8 +140,9 @@ export function AdminCheckinKiosk() {
     const nome = inscricao.corretor?.nome ?? 'Corretor'
     const imobiliaria = inscricao.corretor?.imobiliaria?.nome ?? ''
     applyCheckin(inscricao.qr_code_token)
+    setLastInscricao(inscricao)
     setRecentCheckins((rc) => [
-      { key: `${inscricao.id}-${Date.now()}`, nome, imobiliaria, at: new Date().toISOString() },
+      { key: `${inscricao.id}-${Date.now()}`, nome, imobiliaria, at: new Date().toISOString(), inscricao },
       ...rc.slice(0, 19),
     ])
     showFeedback({ ok: true, title: nome, subtitle: imobiliaria || 'Check-in confirmado!' })
@@ -170,6 +185,9 @@ export function AdminCheckinKiosk() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-950 text-white overflow-hidden">
+
+      {/* Comprovante de presença (visível só na impressão) */}
+      <ComprovantePresenca inscricao={printTarget} evento={evento} />
 
       {/* ── Header ── */}
       <header className="flex items-center gap-3 px-4 py-3 bg-gray-900 border-b border-gray-800 flex-shrink-0">
@@ -247,9 +265,19 @@ export function AdminCheckinKiosk() {
                 </p>
               </div>
               {feedback.ok && (
-                <div className="flex items-center gap-2 bg-green-900/60 border border-green-700 rounded-full px-4 py-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
-                  <span className="text-xs font-semibold text-green-300">Presença confirmada</span>
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex items-center gap-2 bg-green-900/60 border border-green-700 rounded-full px-4 py-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                    <span className="text-xs font-semibold text-green-300">Presença confirmada</span>
+                  </div>
+                  {lastInscricao && (
+                    <button
+                      onClick={() => handlePrint(lastInscricao)}
+                      className="flex items-center gap-2 bg-white text-green-800 hover:bg-green-50 font-bold text-sm px-5 py-2.5 rounded-xl shadow-lg transition-colors"
+                    >
+                      <Printer className="w-4 h-4" /> Imprimir comprovante
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -440,9 +468,18 @@ export function AdminCheckinKiosk() {
                         <p className="text-[11px] text-gray-500 truncate">{c.imobiliaria}</p>
                       )}
                     </div>
-                    <span className="text-[10px] text-gray-600 flex-shrink-0 font-mono">
-                      {new Date(c.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className="text-[10px] text-gray-600 font-mono">
+                        {new Date(c.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <button
+                        onClick={() => handlePrint(c.inscricao)}
+                        title="Imprimir comprovante"
+                        className="flex items-center gap-1 text-[10px] font-semibold text-green-400 hover:text-green-300 transition-colors"
+                      >
+                        <Printer className="w-3 h-3" /> Imprimir
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

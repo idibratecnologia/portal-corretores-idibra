@@ -48,15 +48,21 @@ enum TipoEvento {
   outro
 }
 
+enum NivelAdmin {
+  super     // Acesso total: excluir, logs e gerenciar usuários
+  operador  // Quase tudo (criar/editar/ver), sem excluir/logs/usuários
+}
+
 // ─── Admin ────────────────────────────────────────────────────────
 
 model Admin {
-  id         String   @id @default(uuid())
+  id         String     @id @default(uuid())
   nome       String
-  email      String   @unique
-  senha      String   // Armazenado como bcrypt hash (salt rounds: 12)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  email      String     @unique
+  senha      String     // Armazenado como bcrypt hash (salt rounds: 12)
+  nivel      NivelAdmin @default(operador)
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
 
   @@map("admins")
 }

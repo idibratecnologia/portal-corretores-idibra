@@ -18,10 +18,13 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { getErrorMessage } from '@/lib/errors'
+import { useAuth } from '@/contexts/AuthContext'
 import type { Imobiliaria } from '@/types'
 
 export function AdminImobiliarias() {
   const { toast } = useToast()
+  const { adminUser } = useAuth()
+  const isSuper = adminUser?.nivel === 'super'
   const [isLoading, setIsLoading] = useState(true)
   const [imobiliarias, setImobiliarias] = useState<Imobiliaria[]>([])
   const [search, setSearch] = useState('')
@@ -218,15 +221,17 @@ export function AdminImobiliarias() {
                     <><ToggleLeft className="w-3 h-3 mr-1 text-gray-400" /> Inativa</>
                   )}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setConfirmDelete(imob)}
-                  className="text-red-500 hover:text-red-600 hover:bg-red-50 border-gray-200 hover:border-red-200 px-2.5"
-                  title="Excluir imobiliária"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
+                {isSuper && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmDelete(imob)}
+                    className="text-red-500 hover:text-red-600 hover:bg-red-50 border-gray-200 hover:border-red-200 px-2.5"
+                    title="Excluir imobiliária"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                )}
               </div>
             </div>
           ))

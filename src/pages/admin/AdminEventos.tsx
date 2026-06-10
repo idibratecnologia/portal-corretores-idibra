@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, Search, Eye, Edit2, CheckCircle, XCircle,
-  PlayCircle, StopCircle, Calendar, Ban, ChevronUp, ChevronDown, BadgeCheck,
+  PlayCircle, StopCircle, Calendar, Ban, ChevronUp, ChevronDown, BadgeCheck, Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +15,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { fetchEventos, createEvento, updateEvento, setEventoStatus, uploadBannerEvento } from '@/services/eventos'
+import { fetchEventos, createEvento, updateEvento, setEventoStatus, uploadBannerEvento, deleteEvento } from '@/services/eventos'
+import { useAuth } from '@/contexts/AuthContext'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -74,6 +75,8 @@ function SortTh({ label, field, current, dir, onSort, className }: {
 export function AdminEventos() {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { adminUser } = useAuth()
+  const isSuper = adminUser?.nivel === 'super'
   const [eventos, setEventos] = useState<Evento[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -82,6 +85,7 @@ export function AdminEventos() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingEvento, setEditingEvento] = useState<Evento | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ evento: Evento; action: 'encerrar' | 'cancelar' } | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<Evento | null>(null)
   const [page, setPage] = useState(1)
   const [sortField, setSortField] = useState<SortFieldE>('data_evento')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -148,6 +152,18 @@ export function AdminEventos() {
       })
     } catch (err) {
       toast({ title: 'Erro', description: getErrorMessage(err), variant: 'destructive' })
+    }
+  }
+
+  const handleDelete = async (evento: Evento) => {
+    try {
+      await deleteEvento(evento.id)
+      setEventos((prev) => prev.filter((e) => e.id !== evento.id))
+      toast({ title: 'Evento excluído', description: evento.titulo })
+    } catch (err) {
+      toast({ title: 'Erro ao excluir', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setConfirmDelete(null)
     }
   }
 
@@ -420,6 +436,19 @@ export function AdminEventos() {
                                   <Ban className="w-3.5 h-3.5" />
                                 </span>
                               )}
+
+                              {isSuper && (
+                                <>
+                                  <span className="w-px h-5 bg-gray-200 mx-0.5" />
+                                  <button
+                                    onClick={() => setConfirmDelete(evento)}
+                                    title="Excluir evento"
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 hover:scale-105 transition-all"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -467,6 +496,30 @@ export function AdminEventos() {
               className={cn('rounded-xl', confirmAction?.action === 'cancelar' ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600')}
             >
               {confirmAction?.action === 'cancelar' ? 'Sim, cancelar' : 'Sim, encerrar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Exclusão de evento (super-admin) */}
+      <AlertDialog open={!!confirmDelete} onOpenChange={(open) => { if (!open) setConfirmDelete(null) }}>
+        <AlertDialogContent className="rounded-2xl max-w-sm">
+          <AlertDialogHeader>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-1 bg-red-50">
+              <Trash2 className="w-6 h-6 text-red-500" />
+            </div>
+            <AlertDialogTitle className="text-base">Excluir evento?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              O evento <strong>"{confirmDelete?.titulo}"</strong> e todas as suas inscrições serão removidos permanentemente. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDelete && handleDelete(confirmDelete)}
+              className="rounded-xl bg-red-600 hover:bg-red-700"
+            >
+              Sim, excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

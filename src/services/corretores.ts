@@ -111,6 +111,12 @@ export async function setCorretorStatus(
   await api.patch(`/corretores/${id}/status`, { status })
 }
 
+/** Exclui um corretor (somente super-admin). */
+export async function deleteCorretor(id: string): Promise<void> {
+  if (USE_MOCK) { console.log('[mock] deleteCorretor', id); return }
+  await api.delete(`/corretores/${id}`)
+}
+
 /** Upload de foto de perfil */
 export async function uploadFotoCorretor(
   id: string,

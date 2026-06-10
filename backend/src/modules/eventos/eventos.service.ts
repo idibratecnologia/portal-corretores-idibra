@@ -206,6 +206,15 @@ export async function updateBanner(id: string, buffer: Buffer): Promise<{ banner
   return { banner_url }
 }
 
+/** Exclui um evento (e suas inscrições via cascade). Remove o banner do storage. */
+export async function deleteEvento(id: string): Promise<void> {
+  const evento = await prisma.evento.findUnique({ where: { id }, select: { banner_url: true } })
+  if (!evento) throw new NotFoundError('Evento não encontrado')
+
+  await prisma.evento.delete({ where: { id } })
+  await deleteImage(evento.banner_url)
+}
+
 /** Remove o banner do evento. */
 export async function removeBanner(id: string): Promise<void> {
   const evento = await prisma.evento.findUnique({ where: { id }, select: { banner_url: true } })

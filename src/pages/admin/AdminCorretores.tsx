@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Eye, Edit2, UserCheck, UserX, Users, ChevronUp, ChevronDown } from 'lucide-react'
+import { Plus, Search, Eye, Edit2, UserCheck, UserX, Users, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -8,9 +8,14 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { SkeletonTable } from '@/components/shared/Skeleton'
 import { TablePagination } from '@/components/shared/TablePagination'
 import { CorretorModal } from '@/components/admin/CorretorModal'
-import { fetchCorretores, createCorretor, updateCorretor, setCorretorStatus } from '@/services/corretores'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { fetchCorretores, createCorretor, updateCorretor, setCorretorStatus, deleteCorretor } from '@/services/corretores'
 import { fetchImobiliarias } from '@/services/imobiliarias'
 import { PENDING_CHANGED_EVENT } from '@/components/admin/AdminSidebar'
+import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { getErrorMessage } from '@/lib/errors'
@@ -45,8 +50,11 @@ function SortTh({ label, field, current, dir, onSort, className }: {
 export function AdminCorretores() {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { adminUser } = useAuth()
+  const isSuper = adminUser?.nivel === 'super'
   const [isLoading, setIsLoading] = useState(true)
   const [corretores, setCorretores] = useState<Corretor[]>([])
+  const [confirmDelete, setConfirmDelete] = useState<Corretor | null>(null)
   const [imobiliarias, setImobiliarias] = useState<Imobiliaria[]>([])
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search)
@@ -114,6 +122,19 @@ export function AdminCorretores() {
       toast({ title: 'Status atualizado', description: `Corretor ${status === 'ativo' ? 'ativado' : 'bloqueado'} com sucesso.` })
     } catch (err) {
       toast({ title: 'Erro', description: getErrorMessage(err), variant: 'destructive' })
+    }
+  }
+
+  const handleDelete = async (corretor: Corretor) => {
+    try {
+      await deleteCorretor(corretor.id)
+      setCorretores((prev) => prev.filter((c) => c.id !== corretor.id))
+      window.dispatchEvent(new Event(PENDING_CHANGED_EVENT))
+      toast({ title: 'Corretor excluído', description: corretor.nome })
+    } catch (err) {
+      toast({ title: 'Erro ao excluir', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setConfirmDelete(null)
     }
   }
 
@@ -273,6 +294,15 @@ export function AdminCorretores() {
                                 <UserX className="w-4 h-4" />
                               </button>
                             )}
+                            {isSuper && (
+                              <button
+                                onClick={() => setConfirmDelete(corretor)}
+                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Excluir corretor"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -299,6 +329,30 @@ export function AdminCorretores() {
         onSave={handleSave}
         corretor={editingCorretor}
       />
+
+      {/* Exclusão de corretor (super-admin) */}
+      <AlertDialog open={!!confirmDelete} onOpenChange={(open) => { if (!open) setConfirmDelete(null) }}>
+        <AlertDialogContent className="rounded-2xl max-w-sm">
+          <AlertDialogHeader>
+            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-1">
+              <Trash2 className="w-6 h-6 text-red-500" />
+            </div>
+            <AlertDialogTitle className="text-base">Excluir corretor?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              O corretor <strong>"{confirmDelete?.nome}"</strong> e suas inscrições serão removidos permanentemente. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDelete && handleDelete(confirmDelete)}
+              className="rounded-xl bg-red-600 hover:bg-red-700"
+            >
+              Sim, excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

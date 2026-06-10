@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import { fetchConfiguracao, updateConfiguracao } from '@/services/configuracoes'
 import { getErrorMessage } from '@/lib/errors'
 import { WhatsappSync } from '@/components/admin/WhatsappSync'
+import { ImportarDados } from '@/components/admin/ImportarDados'
 
 interface EmpresaForm {
   nome: string
@@ -212,6 +213,9 @@ export function AdminConfiguracoes() {
 
         {/* Integração WhatsApp */}
         <WhatsappSync />
+
+        {/* Importação em massa */}
+        <ImportarDados />
       </div>
     </div>
   )

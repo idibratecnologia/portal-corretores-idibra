@@ -88,12 +88,15 @@ export interface EventoInscricao {
   created_at: string
 }
 
+export type NivelAdmin = 'super' | 'operador'
+
 export interface AdminUser {
   id: string
   nome: string
   email: string
-  perfil: 'admin' | 'superadmin'
-  ativo: boolean
+  nivel: NivelAdmin
+  perfil?: 'admin' | 'superadmin'
+  ativo?: boolean
   created_at: string
 }
 

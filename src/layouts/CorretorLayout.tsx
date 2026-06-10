@@ -1,8 +1,10 @@
+import { Suspense } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { CorretorSidebar } from '@/components/corretor/CorretorSidebar'
 import { useAuth } from '@/contexts/AuthContext'
 import { Toaster } from '@/components/ui/toaster'
 import { NotificationBell } from '@/components/shared/NotificationBell'
+import { RouteFallback } from '@/components/shared/RouteFallback'
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/portal/home':       { title: 'Início',      subtitle: 'Bem-vindo ao portal IDIBRA'           },
@@ -49,7 +51,9 @@ export function CorretorLayout() {
         <main className="flex-1 overflow-y-auto">
           {/* key por rota → reexecuta a animação de entrada a cada navegação */}
           <div key={location.pathname} className="p-5 lg:p-7 page-enter">
-            <Outlet />
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

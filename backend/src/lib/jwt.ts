@@ -7,11 +7,13 @@ import { config } from '@/config'
 import { UnauthorizedError } from '@/lib/errors'
 
 export type UserRole = 'admin' | 'corretor'
+export type NivelAdmin = 'super' | 'operador'
 
 export interface JWTPayload {
-  sub:  string   // ID do usuário
-  role: UserRole
-  nome: string
+  sub:   string   // ID do usuário
+  role:  UserRole
+  nome:  string
+  nivel?: NivelAdmin   // apenas para admins (super | operador)
 }
 
 // expiresIn vem do .env como string ("8h", "30d") — o tipo do jsonwebtoken

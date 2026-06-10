@@ -219,6 +219,15 @@ export async function resetSenhaAdmin(id: string): Promise<{ senha_temporaria: s
   return { senha_temporaria }
 }
 
+/** Exclui um corretor (e suas inscrições via cascade). Remove a foto do storage. */
+export async function deleteCorretor(id: string): Promise<void> {
+  const corretor = await prisma.corretor.findUnique({ where: { id }, select: { foto_url: true } })
+  if (!corretor) throw new NotFoundError('Corretor não encontrado')
+
+  await prisma.corretor.delete({ where: { id } })
+  await deleteImage(corretor.foto_url)
+}
+
 /** Remove a foto de perfil. */
 export async function removeFoto(id: string): Promise<void> {
   const corretor = await prisma.corretor.findUnique({

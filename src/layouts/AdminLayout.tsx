@@ -1,8 +1,10 @@
+import { Suspense } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { AdminSidebar } from '@/components/admin/AdminSidebar'
 import { useAuth } from '@/contexts/AuthContext'
 import { Toaster } from '@/components/ui/toaster'
 import { NotificationBell } from '@/components/shared/NotificationBell'
+import { RouteFallback } from '@/components/shared/RouteFallback'
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/admin/dashboard':    { title: 'Dashboard',       subtitle: 'Visão geral da plataforma' },
@@ -10,6 +12,8 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/admin/corretores':   { title: 'Corretores',       subtitle: 'Cadastro e gestão de corretores' },
   '/admin/imobiliarias': { title: 'Imobiliárias',     subtitle: 'Gestão de imobiliárias parceiras' },
   '/admin/relatorios':   { title: 'Relatórios',       subtitle: 'Análise e exportação de dados' },
+  '/admin/notificacoes': { title: 'Notificações',     subtitle: 'Central de mensagens e gatilhos' },
+  '/admin/usuarios':     { title: 'Usuários',         subtitle: 'Administradores e operadores' },
   '/admin/configuracoes':{ title: 'Configurações',    subtitle: 'Configurações gerais do sistema' },
 }
 
@@ -53,7 +57,9 @@ export function AdminLayout() {
         <main className="flex-1 overflow-y-auto">
           {/* key por rota → reexecuta a animação de entrada a cada navegação */}
           <div key={location.pathname} className="p-5 lg:p-7 page-enter">
-            <Outlet />
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

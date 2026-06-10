@@ -33,7 +33,7 @@ export async function login({ email, senha }: LoginInput): Promise<AuthResult> {
     const ok = await verifyPassword(senha, admin.senha)
     if (!ok) throw new UnauthorizedError('E-mail ou senha inválidos')
 
-    return buildAuthResult(admin.id, admin.nome, 'admin')
+    return buildAuthResult(admin.id, admin.nome, 'admin', admin.nivel)
   }
 
   // 2. Tenta como corretor
@@ -113,7 +113,7 @@ export async function refresh(refreshToken: string): Promise<{ access_token: str
   if (payload.role === 'admin') {
     const admin = await prisma.admin.findUnique({ where: { id: payload.sub } })
     if (!admin) throw new UnauthorizedError('Usuário não encontrado')
-    return { access_token: signAccessToken({ sub: admin.id, role: 'admin', nome: admin.nome }) }
+    return { access_token: signAccessToken({ sub: admin.id, role: 'admin', nome: admin.nome, nivel: admin.nivel }) }
   }
 
   const corretor = await prisma.corretor.findUnique({ where: { id: payload.sub } })
@@ -129,7 +129,7 @@ export async function refresh(refreshToken: string): Promise<{ access_token: str
 export async function getAdminMe(adminId: string) {
   const admin = await prisma.admin.findUnique({
     where:  { id: adminId },
-    select: { id: true, nome: true, email: true, created_at: true },
+    select: { id: true, nome: true, email: true, nivel: true, created_at: true },
   })
   if (!admin) throw new UnauthorizedError('Administrador não encontrado')
   return admin
@@ -182,7 +182,7 @@ export async function esqueciSenha(email: string): Promise<void> {
     data: { email, token, expires_at: expires },
   })
 
-  const link = `${config.upload.apiUrl.replace(':3000', ':5173')}/resetar-senha?token=${token}`
+  const link = `${config.portalUrl}/resetar-senha?token=${token}`
 
   // Entrega via WhatsApp (corretor com opt-in). Em dev sem Evolution, o stub loga.
   if (corretor) {
@@ -231,9 +231,10 @@ function buildAuthResult(
   id: string,
   nome: string,
   role: 'admin' | 'corretor',
+  nivel?: 'super' | 'operador',
 ): AuthResult {
   return {
-    access_token:  signAccessToken({ sub: id, role, nome }),
+    access_token:  signAccessToken({ sub: id, role, nome, nivel }),
     refresh_token: signRefreshToken({ sub: id, role }),
     user: { id, nome, role },
   }

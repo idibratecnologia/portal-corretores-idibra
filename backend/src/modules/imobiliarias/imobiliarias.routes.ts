@@ -14,7 +14,7 @@ import * as service from './imobiliarias.service'
 import {
   createImobiliariaSchema, updateImobiliariaSchema, statusImobiliariaSchema,
 } from './imobiliarias.schema'
-import { authenticate, requireAdmin } from '@/middlewares/auth.middleware'
+import { authenticate, requireAdmin, requireSuperAdmin } from '@/middlewares/auth.middleware'
 import { readImageUpload } from '@/lib/upload'
 
 const idParam = z.object({ id: z.string().uuid('ID inválido') })
@@ -60,7 +60,7 @@ export async function imobiliariasRoutes(app: FastifyInstance) {
     return reply.send(await service.setStatus(id, status))
   })
 
-  app.delete('/:id', async (req, reply) => {
+  app.delete('/:id', { preHandler: requireSuperAdmin }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
     await service.deleteImobiliaria(id)
     return reply.status(204).send()

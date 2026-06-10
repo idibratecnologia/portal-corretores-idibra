@@ -27,6 +27,8 @@ import { lembretesRoutes } from '@/modules/lembretes/lembretes.routes'
 import { whatsappRoutes } from '@/modules/whatsapp/whatsapp.routes'
 import { templatesRoutes } from '@/modules/templates/templates.routes'
 import { notificationsRoutes } from '@/modules/notifications/notifications.routes'
+import { importRoutes } from '@/modules/import/import.routes'
+import { usuariosRoutes } from '@/modules/usuarios/usuarios.routes'
 import { seedTemplates } from '@/modules/templates/templates.service'
 import { agendarLembretes } from '@/jobs/lembretes'
 
@@ -149,6 +151,8 @@ async function buildServer() {
   await app.register(whatsappRoutes,     { prefix: '/whatsapp' })
   await app.register(templatesRoutes,    { prefix: '/templates' })
   await app.register(notificationsRoutes, { prefix: '/notifications' })
+  await app.register(importRoutes,       { prefix: '/import' })
+  await app.register(usuariosRoutes,     { prefix: '/usuarios' })
 
   return app
 }

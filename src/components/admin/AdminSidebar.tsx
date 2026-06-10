@@ -8,6 +8,7 @@ import {
   BarChart3,
   Bell,
   Settings,
+  ShieldCheck,
   LogOut,
   Menu,
   X,
@@ -40,6 +41,7 @@ const navGroups = [
     items: [
       { to: '/admin/relatorios', icon: BarChart3, label: 'Relatórios' },
       { to: '/admin/notificacoes', icon: Bell, label: 'Notificações' },
+      { to: '/admin/usuarios', icon: ShieldCheck, label: 'Usuários', superOnly: true },
       { to: '/admin/configuracoes', icon: Settings, label: 'Configurações' },
     ],
   },
@@ -91,7 +93,9 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               {group.label}
             </p>
             <div className="space-y-0.5">
-              {group.items.map((item) => (
+              {group.items
+                .filter((item) => !('superOnly' in item && item.superOnly) || adminUser?.nivel === 'super')
+                .map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}

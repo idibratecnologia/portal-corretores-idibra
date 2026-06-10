@@ -18,7 +18,7 @@ import {
   listCorretoresSchema, createCorretorSchema, updateCorretorSchema,
   updateMeuPerfilSchema, statusCorretorSchema, optInSchema,
 } from './corretores.schema'
-import { authenticate, requireAdmin, requireCorretor } from '@/middlewares/auth.middleware'
+import { authenticate, requireAdmin, requireSuperAdmin, requireCorretor } from '@/middlewares/auth.middleware'
 import { readImageUpload } from '@/lib/upload'
 import { ForbiddenError } from '@/lib/errors'
 
@@ -100,5 +100,12 @@ export async function corretoresRoutes(app: FastifyInstance) {
   app.post('/:id/resetar-senha', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
     return reply.send(await service.resetSenhaAdmin(id))
+  })
+
+  // ── Excluir corretor (somente super-admin) ─────────────────────
+  app.delete('/:id', { preHandler: [authenticate, requireSuperAdmin] }, async (req, reply) => {
+    const { id } = idParam.parse(req.params)
+    await service.deleteCorretor(id)
+    return reply.status(204).send()
   })
 }

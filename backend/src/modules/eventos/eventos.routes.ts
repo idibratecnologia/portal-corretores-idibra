@@ -11,7 +11,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import * as service from './eventos.service'
 import { listEventosSchema, createEventoSchema, updateEventoSchema, statusEventoSchema } from './eventos.schema'
-import { authenticate, requireAdmin } from '@/middlewares/auth.middleware'
+import { authenticate, requireAdmin, requireSuperAdmin } from '@/middlewares/auth.middleware'
 import { readImageUpload } from '@/lib/upload'
 
 const idParam = z.object({ id: z.string().uuid('ID inválido') })
@@ -58,6 +58,13 @@ export async function eventosRoutes(app: FastifyInstance) {
   app.delete('/:id/banner', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
     await service.removeBanner(id)
+    return reply.status(204).send()
+  })
+
+  // ── Excluir evento (somente super-admin) ───────────────────────
+  app.delete('/:id', { preHandler: [authenticate, requireSuperAdmin] }, async (req, reply) => {
+    const { id } = idParam.parse(req.params)
+    await service.deleteEvento(id)
     return reply.status(204).send()
   })
 }

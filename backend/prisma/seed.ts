@@ -26,11 +26,12 @@ async function main() {
 
   const admin = await prisma.admin.upsert({
     where:  { email: adminEmail },
-    update: {},
+    update: { nivel: 'super' },   // garante que o admin padrão é super
     create: {
       nome:  'Administrador IDIBRA',
       email: adminEmail,
       senha: senhaHash,
+      nivel: 'super',
     },
   })
 

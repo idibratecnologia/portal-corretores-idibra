@@ -46,6 +46,20 @@ export async function requireAdmin(req: FastifyRequest, _reply: FastifyReply): P
 }
 
 /**
+ * Exige que o admin autenticado seja SUPER (dono).
+ * Usado nas ações sensíveis: excluir, logs e gestão de usuários.
+ * Deve ser usado APÓS o `authenticate`.
+ */
+export async function requireSuperAdmin(req: FastifyRequest, _reply: FastifyReply): Promise<void> {
+  if (!req.user) {
+    throw new UnauthorizedError('Não autenticado')
+  }
+  if (req.user.role !== 'admin' || req.user.nivel !== 'super') {
+    throw new ForbiddenError('Ação restrita ao administrador')
+  }
+}
+
+/**
  * Exige que o usuário autenticado seja corretor.
  * Deve ser usado APÓS o `authenticate`.
  */

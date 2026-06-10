@@ -1,8 +1,9 @@
-import { lazy, Suspense, type ComponentType } from 'react'
+import { lazy, Suspense, useEffect, type ComponentType, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { LoadingScreen } from '@/components/shared/LoadingScreen'
+import { RouteFallback } from '@/components/shared/RouteFallback'
 import { useAuth } from '@/contexts/AuthContext'
 
 // Layouts (carregados no shell — import direto)
@@ -12,11 +13,27 @@ import { CorretorLayout } from '@/layouts/CorretorLayout'
 // Login (primeira tela — import direto para abrir rápido)
 import { LoginPage } from '@/pages/LoginPage'
 
+/** Fábricas de import registradas para pré-carregamento em segundo plano. */
+const prefetchers: Array<() => Promise<unknown>> = []
+
 /** Helper: transforma um export nomeado em módulo lazy (default). */
 const lazyNamed = <T,>(
   factory: () => Promise<T>,
   name: keyof T,
-) => lazy(() => factory().then((m) => ({ default: m[name] as ComponentType })))
+) => {
+  prefetchers.push(factory)
+  return lazy(() => factory().then((m) => ({ default: m[name] as ComponentType })))
+}
+
+type IdleWindow = Window & {
+  requestIdleCallback?: (cb: () => void) => number
+  cancelIdleCallback?: (id: number) => void
+}
+
+/** Baixa os chunks das páginas em segundo plano, sem travar a navegação. */
+function prefetchRoutes() {
+  prefetchers.forEach((load) => { void load().catch(() => {}) })
+}
 
 // Auth pages
 const CadastroPage = lazyNamed(() => import('@/pages/CadastroPage'), 'CadastroPage')
@@ -33,6 +50,7 @@ const AdminImobiliarias = lazyNamed(() => import('@/pages/admin/AdminImobiliaria
 const AdminRelatorios = lazyNamed(() => import('@/pages/admin/AdminRelatorios'), 'AdminRelatorios')
 const AdminConfiguracoes = lazyNamed(() => import('@/pages/admin/AdminConfiguracoes'), 'AdminConfiguracoes')
 const AdminNotificacoes = lazyNamed(() => import('@/pages/admin/AdminNotificacoes'), 'AdminNotificacoes')
+const AdminUsuarios = lazyNamed(() => import('@/pages/admin/AdminUsuarios'), 'AdminUsuarios')
 const AdminCheckinKiosk = lazyNamed(() => import('@/pages/admin/AdminCheckinKiosk'), 'AdminCheckinKiosk')
 const AdminCredenciamento = lazyNamed(() => import('@/pages/admin/AdminCredenciamento'), 'AdminCredenciamento')
 const AdminAprovacoes = lazyNamed(() => import('@/pages/admin/AdminAprovacoes'), 'AdminAprovacoes')
@@ -45,6 +63,13 @@ const CorretorInscricoes = lazyNamed(() => import('@/pages/corretor/CorretorInsc
 const CorretorHistorico = lazyNamed(() => import('@/pages/corretor/CorretorHistorico'), 'CorretorHistorico')
 const CorretorPerfil = lazyNamed(() => import('@/pages/corretor/CorretorPerfil'), 'CorretorPerfil')
 
+/** Restringe rotas a admins 'super' (dono). Operador é redirecionado. */
+function SuperRoute({ children }: { children: ReactNode }) {
+  const { adminUser } = useAuth()
+  if (adminUser?.nivel !== 'super') return <Navigate to="/admin/dashboard" replace />
+  return <>{children}</>
+}
+
 /**
  * Componente interno que usa useAuth — deve estar dentro de AuthProvider.
  * Exibe LoadingScreen enquanto o auth restaura a sessão do localStorage.
@@ -52,10 +77,23 @@ const CorretorPerfil = lazyNamed(() => import('@/pages/corretor/CorretorPerfil')
 function AppRoutes() {
   const { loading } = useAuth()
 
+  // Após o app abrir, pré-carrega as páginas em segundo plano (quando ocioso)
+  // para que as navegações seguintes sejam praticamente instantâneas.
+  useEffect(() => {
+    if (loading) return
+    const w = window as IdleWindow
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(prefetchRoutes)
+      return () => w.cancelIdleCallback?.(id)
+    }
+    const t = setTimeout(prefetchRoutes, 1500)
+    return () => clearTimeout(t)
+  }, [loading])
+
   if (loading) return <LoadingScreen />
 
   return (
-    <Suspense fallback={<LoadingScreen />}>
+    <Suspense fallback={<RouteFallback />}>
     <Routes>
       {/* Root */}
       <Route path="/" element={<Navigate to="/login" replace />} />
@@ -80,6 +118,7 @@ function AppRoutes() {
         <Route path="imobiliarias" element={<AdminImobiliarias />} />
         <Route path="relatorios" element={<AdminRelatorios />} />
         <Route path="notificacoes" element={<AdminNotificacoes />} />
+        <Route path="usuarios" element={<SuperRoute><AdminUsuarios /></SuperRoute>} />
         <Route path="configuracoes" element={<AdminConfiguracoes />} />
       </Route>
 

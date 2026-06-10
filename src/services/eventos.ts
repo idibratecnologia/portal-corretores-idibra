@@ -95,6 +95,12 @@ export async function setEventoStatus(
   await api.patch(`/eventos/${id}/status`, { status })
 }
 
+/** Exclui um evento (somente super-admin). */
+export async function deleteEvento(id: string): Promise<void> {
+  if (USE_MOCK) { console.log('[mock] deleteEvento', id); return }
+  await api.delete(`/eventos/${id}`)
+}
+
 /** Upload de banner do evento */
 export async function uploadBannerEvento(
   id: string,

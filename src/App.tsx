@@ -95,16 +95,16 @@ function AppRoutes() {
   return (
     <Suspense fallback={<RouteFallback />}>
     <Routes>
-      {/* Root */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<LoginPage />} />
+      {/* Root = página de entrada/login (canônica p/ SEO; sem redirect) */}
+      <Route path="/" element={<LoginPage />} />
       <Route path="/cadastro" element={<CadastroPage />} />
       <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
       <Route path="/resetar-senha" element={<ResetarSenhaPage />} />
 
-      {/* Legacy login redirects */}
-      <Route path="/admin/login" element={<Navigate to="/login" replace />} />
-      <Route path="/portal/login" element={<Navigate to="/login" replace />} />
+      {/* Redireciona variações de login para a raiz (consolida o canônico) */}
+      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/admin/login" element={<Navigate to="/" replace />} />
+      <Route path="/portal/login" element={<Navigate to="/" replace />} />
 
       {/* Admin routes */}
       <Route path="/admin" element={<AdminLayout />}>

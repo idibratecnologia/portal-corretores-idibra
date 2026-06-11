@@ -6,9 +6,9 @@ import { Eye, EyeOff, Lock, Mail, ArrowRight, CheckCircle, Users, Calendar, Tren
 import { useAuth } from '@/contexts/AuthContext'
 
 const benefits = [
-  'Acesso exclusivo a lançamentos IDIBRA',
-  'Treinamentos e workshops gratuitos',
-  'Acompanhe participações e histórico em tempo real',
+  'Acesso exclusivo a lançamentos imobiliários da IDIBRA',
+  'Inscrição em eventos, treinamentos e workshops',
+  'Acompanhamento de participações e histórico em tempo real',
 ]
 
 const platformStats = [
@@ -59,14 +59,12 @@ export function LoginPage() {
         {/* Copy */}
         <div className="relative space-y-6">
           <div>
-            <h1 className="text-3xl font-bold text-white leading-tight">
-              Portal de<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-300">
-                Corretores Parceiros
-              </span>
-            </h1>
-            <p className="text-slate-400 text-sm mt-3 leading-relaxed max-w-xs">
-              Gerencie eventos, inscrições e acompanhe o desempenho dos seus corretores em um só lugar.
+            <h1 className="text-4xl font-extrabold text-white leading-tight">Corretor IDIBRA</h1>
+            <h2 className="text-2xl font-bold leading-tight mt-1 text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-300">
+              Portal de Corretores Parceiros
+            </h2>
+            <p className="text-slate-400 text-sm mt-3 leading-relaxed max-w-sm">
+              Portal oficial para corretores parceiros da IDIBRA acompanharem lançamentos imobiliários, eventos comerciais, inscrições, treinamentos e histórico de participação.
             </p>
           </div>
           <div className="space-y-3">
@@ -98,11 +96,15 @@ export function LoginPage() {
       {/* ── Right form panel ── */}
       <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
         <div className="w-full max-w-sm">
-          {/* Mobile logo */}
-          <div className="flex items-center justify-center mb-8 lg:hidden">
+          {/* Mobile logo + texto (visível e indexável no mobile) */}
+          <div className="flex flex-col items-center text-center mb-8 lg:hidden">
             <div className="bg-white rounded-2xl px-5 py-3 shadow-sm border border-gray-100">
-              <img src={idibraLogoPreta} alt="IDIBRA" className="h-8 w-auto object-contain" />
+              <img src={idibraLogoPreta} alt="Corretor IDIBRA" className="h-8 w-auto object-contain" />
             </div>
+            <p className="mt-4 text-base font-bold text-gray-900">Corretor IDIBRA</p>
+            <p className="text-xs text-gray-500 mt-0.5 max-w-xs">
+              Portal de Corretores Parceiros da IDIBRA — lançamentos imobiliários, eventos, inscrições e treinamentos.
+            </p>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

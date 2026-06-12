@@ -71,4 +71,5 @@ export async function deleteUsuario(id: string, requesterId: string) {
   }
 
   await prisma.admin.delete({ where: { id } })
+  return { nome: alvo.nome }
 }

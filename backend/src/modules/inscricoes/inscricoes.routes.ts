@@ -15,6 +15,7 @@ import * as service from './inscricoes.service'
 import { listInscricoesSchema, createInscricaoSchema, checkinSchema } from './inscricoes.schema'
 import { authenticate, requireAdmin, requireCorretor } from '@/middlewares/auth.middleware'
 import { BadRequestError } from '@/lib/errors'
+import { audit } from '@/lib/audit'
 
 const idParam = z.object({ id: z.string().uuid('ID inválido') })
 const statusManualSchema = z.object({ status: z.enum(['presente', 'ausente', 'cancelado']) })
@@ -90,6 +91,8 @@ export async function inscricoesRoutes(app: FastifyInstance) {
   // ── Certificado: envio em massa por WhatsApp (admin) ───────────
   app.post('/certificados/enviar', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
     const { evento_id } = z.object({ evento_id: z.string().uuid('evento_id inválido') }).parse(req.body)
-    return reply.send(await service.enviarCertificadosEvento(evento_id))
+    const r = await service.enviarCertificadosEvento(evento_id)
+    audit(req, 'enviou', 'certificado', evento_id, null, `${r.enfileirados} certificado(s) por WhatsApp`)
+    return reply.send(r)
   })
 }

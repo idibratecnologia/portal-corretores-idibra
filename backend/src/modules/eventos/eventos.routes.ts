@@ -13,6 +13,7 @@ import * as service from './eventos.service'
 import { listEventosSchema, createEventoSchema, updateEventoSchema, statusEventoSchema } from './eventos.schema'
 import { authenticate, requireAdmin, requireSuperAdmin } from '@/middlewares/auth.middleware'
 import { readImageUpload } from '@/lib/upload'
+import { audit } from '@/lib/audit'
 
 const idParam = z.object({ id: z.string().uuid('ID inválido') })
 
@@ -33,19 +34,25 @@ export async function eventosRoutes(app: FastifyInstance) {
   // ── Mutações (admin) ──────────────────────────────────────────
   app.post('/', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
     const body = createEventoSchema.parse(req.body)
-    return reply.status(201).send(await service.createEvento(body))
+    const ev = await service.createEvento(body)
+    audit(req, 'criou', 'evento', ev.id, ev.titulo)
+    return reply.status(201).send(ev)
   })
 
   app.patch('/:id', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
     const body = updateEventoSchema.parse(req.body)
-    return reply.send(await service.updateEvento(id, body))
+    const ev = await service.updateEvento(id, body)
+    audit(req, 'editou', 'evento', id, ev.titulo)
+    return reply.send(ev)
   })
 
   app.patch('/:id/status', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
     const { status } = statusEventoSchema.parse(req.body)
-    return reply.send(await service.setStatus(id, status))
+    const ev = await service.setStatus(id, status)
+    audit(req, 'status', 'evento', id, ev.titulo, `status: ${status}`)
+    return reply.send(ev)
   })
 
   // ── Banner (admin) ────────────────────────────────────────────
@@ -64,7 +71,8 @@ export async function eventosRoutes(app: FastifyInstance) {
   // ── Excluir evento (somente super-admin) ───────────────────────
   app.delete('/:id', { preHandler: [authenticate, requireSuperAdmin] }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
-    await service.deleteEvento(id)
+    const { titulo } = await service.deleteEvento(id)
+    audit(req, 'excluiu', 'evento', id, titulo)
     return reply.status(204).send()
   })
 }

@@ -51,6 +51,7 @@ const AdminRelatorios = lazyNamed(() => import('@/pages/admin/AdminRelatorios'),
 const AdminConfiguracoes = lazyNamed(() => import('@/pages/admin/AdminConfiguracoes'), 'AdminConfiguracoes')
 const AdminNotificacoes = lazyNamed(() => import('@/pages/admin/AdminNotificacoes'), 'AdminNotificacoes')
 const AdminUsuarios = lazyNamed(() => import('@/pages/admin/AdminUsuarios'), 'AdminUsuarios')
+const AdminLogs = lazyNamed(() => import('@/pages/admin/AdminLogs'), 'AdminLogs')
 const AdminCheckinKiosk = lazyNamed(() => import('@/pages/admin/AdminCheckinKiosk'), 'AdminCheckinKiosk')
 const AdminCredenciamento = lazyNamed(() => import('@/pages/admin/AdminCredenciamento'), 'AdminCredenciamento')
 const AdminAprovacoes = lazyNamed(() => import('@/pages/admin/AdminAprovacoes'), 'AdminAprovacoes')
@@ -119,6 +120,7 @@ function AppRoutes() {
         <Route path="relatorios" element={<AdminRelatorios />} />
         <Route path="notificacoes" element={<AdminNotificacoes />} />
         <Route path="usuarios" element={<SuperRoute><AdminUsuarios /></SuperRoute>} />
+        <Route path="logs" element={<SuperRoute><AdminLogs /></SuperRoute>} />
         <Route path="configuracoes" element={<AdminConfiguracoes />} />
       </Route>
 

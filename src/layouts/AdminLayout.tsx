@@ -14,6 +14,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/admin/relatorios':   { title: 'Relatórios',       subtitle: 'Análise e exportação de dados' },
   '/admin/notificacoes': { title: 'Notificações',     subtitle: 'Central de mensagens e gatilhos' },
   '/admin/usuarios':     { title: 'Usuários',         subtitle: 'Administradores e operadores' },
+  '/admin/logs':         { title: 'Logs',             subtitle: 'Auditoria de ações' },
   '/admin/configuracoes':{ title: 'Configurações',    subtitle: 'Configurações gerais do sistema' },
 }
 

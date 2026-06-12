@@ -126,11 +126,12 @@ export async function removeLogo(id: string): Promise<void> {
  * (onDelete: SetNull no schema), não são excluídos.
  */
 export async function deleteImobiliaria(id: string) {
-  const imob = await prisma.imobiliaria.findUnique({ where: { id }, select: { logo_url: true } })
+  const imob = await prisma.imobiliaria.findUnique({ where: { id }, select: { nome: true, logo_url: true } })
   if (!imob) throw new NotFoundError('Imobiliária não encontrada')
 
   await prisma.imobiliaria.delete({ where: { id } })
   await deleteImage(imob.logo_url) // remove a logo do storage (evita arquivo órfão)
+  return { nome: imob.nome }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────

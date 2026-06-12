@@ -21,6 +21,7 @@ import {
 import { authenticate, requireAdmin, requireSuperAdmin, requireCorretor } from '@/middlewares/auth.middleware'
 import { readImageUpload } from '@/lib/upload'
 import { ForbiddenError } from '@/lib/errors'
+import { audit } from '@/lib/audit'
 
 const idParam = z.object({ id: z.string().uuid('ID inválido') })
 
@@ -74,19 +75,25 @@ export async function corretoresRoutes(app: FastifyInstance) {
 
   app.post('/', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
     const body = createCorretorSchema.parse(req.body)
-    return reply.status(201).send(await service.createCorretor(body))
+    const c = await service.createCorretor(body)
+    audit(req, 'criou', 'corretor', c.id, c.nome)
+    return reply.status(201).send(c)
   })
 
   app.patch('/:id', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
     const body = updateCorretorSchema.parse(req.body)
-    return reply.send(await service.updateCorretor(id, body))
+    const c = await service.updateCorretor(id, body)
+    audit(req, 'editou', 'corretor', id, c.nome)
+    return reply.send(c)
   })
 
   app.patch('/:id/status', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
     const { status } = statusCorretorSchema.parse(req.body)
-    return reply.send(await service.setStatus(id, status))
+    const c = await service.setStatus(id, status)
+    audit(req, status === 'ativo' ? 'aprovou' : 'status', 'corretor', id, c.nome, `status: ${status}`)
+    return reply.send(c)
   })
 
   app.patch('/:id/opt-in', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
@@ -105,7 +112,8 @@ export async function corretoresRoutes(app: FastifyInstance) {
   // ── Excluir corretor (somente super-admin) ─────────────────────
   app.delete('/:id', { preHandler: [authenticate, requireSuperAdmin] }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
-    await service.deleteCorretor(id)
+    const { nome } = await service.deleteCorretor(id)
+    audit(req, 'excluiu', 'corretor', id, nome)
     return reply.status(204).send()
   })
 }

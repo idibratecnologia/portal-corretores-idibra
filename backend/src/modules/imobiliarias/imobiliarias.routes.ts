@@ -15,6 +15,7 @@ import {
   createImobiliariaSchema, updateImobiliariaSchema, statusImobiliariaSchema,
 } from './imobiliarias.schema'
 import { authenticate, requireAdmin, requireSuperAdmin } from '@/middlewares/auth.middleware'
+import { audit } from '@/lib/audit'
 import { readImageUpload } from '@/lib/upload'
 
 const idParam = z.object({ id: z.string().uuid('ID inválido') })
@@ -45,24 +46,31 @@ export async function imobiliariasRoutes(app: FastifyInstance) {
 
   app.post('/', async (req, reply) => {
     const body = createImobiliariaSchema.parse(req.body)
-    return reply.status(201).send(await service.createImobiliaria(body))
+    const i = await service.createImobiliaria(body)
+    audit(req, 'criou', 'imobiliaria', i.id, i.nome)
+    return reply.status(201).send(i)
   })
 
   app.patch('/:id', async (req, reply) => {
     const { id } = idParam.parse(req.params)
     const body = updateImobiliariaSchema.parse(req.body)
-    return reply.send(await service.updateImobiliaria(id, body))
+    const i = await service.updateImobiliaria(id, body)
+    audit(req, 'editou', 'imobiliaria', id, i.nome)
+    return reply.send(i)
   })
 
   app.patch('/:id/status', async (req, reply) => {
     const { id } = idParam.parse(req.params)
     const { status } = statusImobiliariaSchema.parse(req.body)
-    return reply.send(await service.setStatus(id, status))
+    const i = await service.setStatus(id, status)
+    audit(req, 'status', 'imobiliaria', id, i.nome, `status: ${status}`)
+    return reply.send(i)
   })
 
   app.delete('/:id', { preHandler: requireSuperAdmin }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
-    await service.deleteImobiliaria(id)
+    const { nome } = await service.deleteImobiliaria(id)
+    audit(req, 'excluiu', 'imobiliaria', id, nome)
     return reply.status(204).send()
   })
 

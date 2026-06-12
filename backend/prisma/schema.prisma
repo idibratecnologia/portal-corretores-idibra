@@ -223,6 +223,26 @@ model NotificacaoLog {
   @@map("notificacoes_log")
 }
 
+// ─── Log de Auditoria (ações dos administradores) ────────────────
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  admin_id    String?  // quem executou (null = sistema)
+  admin_nome  String   // snapshot do nome (legível mesmo se o admin for removido)
+  acao        String   // criou | editou | excluiu | status | enviou | importou | aprovou
+  entidade    String   // corretor | imobiliaria | evento | usuario | inscricao | certificado | importacao
+  entidade_id String?
+  label       String?  // descrição legível do alvo (nome do corretor, título do evento…)
+  detalhe     String?  // texto opcional com mais contexto
+
+  created_at  DateTime @default(now())
+
+  @@index([entidade])
+  @@index([acao])
+  @@index([created_at])
+  @@map("audit_logs")
+}
+
 // ─── Configurações do Sistema (linha única / singleton) ──────────
 
 model Configuracao {

@@ -11,6 +11,7 @@ import { z } from 'zod'
 import * as service from './usuarios.service'
 import { createUsuarioSchema, updateUsuarioSchema } from './usuarios.schema'
 import { authenticate, requireSuperAdmin } from '@/middlewares/auth.middleware'
+import { audit } from '@/lib/audit'
 
 const idParam = z.object({ id: z.string().uuid('ID inválido') })
 
@@ -24,18 +25,23 @@ export async function usuariosRoutes(app: FastifyInstance) {
 
   app.post('/', async (req, reply) => {
     const body = createUsuarioSchema.parse(req.body)
-    return reply.status(201).send(await service.createUsuario(body))
+    const u = await service.createUsuario(body)
+    audit(req, 'criou', 'usuario', u.id, u.nome, `nível: ${u.nivel}`)
+    return reply.status(201).send(u)
   })
 
   app.patch('/:id', async (req, reply) => {
     const { id } = idParam.parse(req.params)
     const body = updateUsuarioSchema.parse(req.body)
-    return reply.send(await service.updateUsuario(id, body))
+    const u = await service.updateUsuario(id, body)
+    audit(req, 'editou', 'usuario', u.id, u.nome)
+    return reply.send(u)
   })
 
   app.delete('/:id', async (req, reply) => {
     const { id } = idParam.parse(req.params)
-    await service.deleteUsuario(id, req.user!.sub)
+    const { nome } = await service.deleteUsuario(id, req.user!.sub)
+    audit(req, 'excluiu', 'usuario', id, nome)
     return reply.status(204).send()
   })
 }

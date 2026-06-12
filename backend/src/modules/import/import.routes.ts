@@ -13,6 +13,7 @@ import { z } from 'zod'
 import * as service from './import.service'
 import { authenticate, requireAdmin } from '@/middlewares/auth.middleware'
 import { BadRequestError } from '@/lib/errors'
+import { audit } from '@/lib/audit'
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -48,12 +49,16 @@ export async function importRoutes(app: FastifyInstance) {
   app.post('/imobiliarias', async (req, reply) => {
     const { dryRun, modo } = optsSchema.parse(req.query)
     const buffer = await lerArquivo(req)
-    return reply.send(await service.importImobiliarias(buffer, { dryRun, modo }))
+    const r = await service.importImobiliarias(buffer, { dryRun, modo })
+    if (!dryRun) audit(req, 'importou', 'importacao', null, 'imobiliárias', `${r.criados} criada(s), ${r.atualizados} atualizada(s)`)
+    return reply.send(r)
   })
 
   app.post('/corretores', async (req, reply) => {
     const { dryRun, modo } = optsSchema.parse(req.query)
     const buffer = await lerArquivo(req)
-    return reply.send(await service.importCorretores(buffer, { dryRun, modo }))
+    const r = await service.importCorretores(buffer, { dryRun, modo })
+    if (!dryRun) audit(req, 'importou', 'importacao', null, 'corretores', `${r.criados} criado(s), ${r.atualizados} atualizado(s)`)
+    return reply.send(r)
   })
 }

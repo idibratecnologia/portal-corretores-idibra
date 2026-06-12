@@ -1,14 +1,15 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Users, CheckCircle, XCircle, Eye, MapPin, Calendar, Clock, QrCode, X, ScanLine, Tv2, BadgeCheck, Loader2, Maximize2, Send, Download } from 'lucide-react'
+import { Users, CheckCircle, XCircle, Eye, MapPin, Calendar, Clock, QrCode, X, ScanLine, Tv2, BadgeCheck, Loader2, Maximize2, Send, Download, Award } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BackButton } from '@/components/shared/BackButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { StatCard } from '@/components/shared/StatCard'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { QrScanner } from '@/components/shared/QrScanner'
-import { fetchEventoById } from '@/services/eventos'
-import { fetchInscricoesByEvento, realizarCheckin, setInscricaoStatus, reenviarQrInscricao, exportarPresencaCsv } from '@/services/inscricoes'
+import { EventoMateriais } from '@/components/shared/EventoMateriais'
+import { fetchEventoById, updateEvento } from '@/services/eventos'
+import { fetchInscricoesByEvento, realizarCheckin, setInscricaoStatus, reenviarQrInscricao, exportarPresencaCsv, enviarCertificadosEvento } from '@/services/inscricoes'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/errors'
@@ -27,6 +28,8 @@ export function AdminEventoDetalhes() {
   const [bannerModal, setBannerModal] = useState(false)
   const [reenviandoId, setReenviandoId] = useState<string | null>(null)
   const [exportando, setExportando] = useState(false)
+  const [toggleCert, setToggleCert] = useState(false)
+  const [enviandoCert, setEnviandoCert] = useState(false)
   const [scanResult, setScanResult] = useState<{ ok: boolean; message: string; name?: string } | null>(null)
   const [manualToken, setManualToken] = useState('')
   const scanResultTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -100,6 +103,37 @@ export function AdminEventoDetalhes() {
       toast({ title: 'Erro ao exportar', description: getErrorMessage(err), variant: 'destructive' })
     } finally {
       setExportando(false)
+    }
+  }
+
+  const handleToggleCertificados = async () => {
+    if (!evento) return
+    const novo = !evento.certificados_habilitados
+    setToggleCert(true)
+    try {
+      await updateEvento(evento.id, { certificados_habilitados: novo })
+      setEvento({ ...evento, certificados_habilitados: novo })
+      toast({ title: novo ? 'Certificados liberados' : 'Certificados bloqueados', description: novo ? 'Os presentes já podem baixar o certificado.' : undefined })
+    } catch (err) {
+      toast({ title: 'Erro', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setToggleCert(false)
+    }
+  }
+
+  const handleEnviarCertificados = async () => {
+    if (!evento) return
+    setEnviandoCert(true)
+    try {
+      const r = await enviarCertificadosEvento(evento.id)
+      toast({
+        title: 'Certificados enviados',
+        description: `${r.enfileirados} enviado(s) por WhatsApp${r.semOptIn ? ` · ${r.semOptIn} sem opt-in/WhatsApp` : ''}.`,
+      })
+    } catch (err) {
+      toast({ title: 'Erro ao enviar', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setEnviandoCert(false)
     }
   }
 
@@ -270,6 +304,46 @@ export function AdminEventoDetalhes() {
           </div>
         </div>
       </div>
+
+      {/* Certificados */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <Award className="w-4 h-4 text-green-600" />
+          <h2 className="font-semibold text-gray-900">Certificados de participação</h2>
+        </div>
+        <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <button
+              role="switch"
+              aria-checked={!!evento.certificados_habilitados}
+              onClick={handleToggleCertificados}
+              disabled={toggleCert}
+              className={`mt-0.5 w-11 h-6 rounded-full flex-shrink-0 transition-colors ${evento.certificados_habilitados ? 'bg-green-600' : 'bg-gray-300'} disabled:opacity-60`}
+            >
+              <span className={`block w-5 h-5 bg-white rounded-full shadow transform transition-transform ${evento.certificados_habilitados ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+            <div>
+              <p className="text-sm font-medium text-gray-800">
+                {evento.certificados_habilitados ? 'Certificados liberados' : 'Certificados bloqueados'}
+              </p>
+              <p className="text-xs text-gray-500 max-w-md">
+                Quando liberado, os corretores <strong>presentes</strong> podem baixar o certificado no portal e você pode enviá-los por WhatsApp.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={handleEnviarCertificados}
+            disabled={!evento.certificados_habilitados || enviandoCert || total_presentes === 0}
+            className="bg-green-700 hover:bg-green-800 gap-1.5 self-start"
+          >
+            {enviandoCert ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            Enviar certificados (WhatsApp)
+          </Button>
+        </div>
+      </div>
+
+      {/* Materiais do evento */}
+      {id && <EventoMateriais eventoId={id} admin />}
 
       {/* Inscritos table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">

@@ -138,9 +138,11 @@ model Evento {
   banner_url         String?      // Caminho relativo: /uploads/banners/{uuid}.webp
   status             StatusEvento @default(rascunho)
   inscricoes_abertas Boolean      @default(true)
+  certificados_habilitados Boolean @default(false)  // Admin libera a emissão de certificados
 
   inscricoes         Inscricao[]
   notificacoes       NotificacaoLog[]
+  materiais          EventoMaterial[]
 
   created_at         DateTime     @default(now())
   updated_at         DateTime     @updatedAt
@@ -148,6 +150,28 @@ model Evento {
   @@index([status])
   @@index([data_evento])
   @@map("eventos")
+}
+
+// ─── Material de Evento (arquivo ou link) ────────────────────────
+
+enum TipoMaterial {
+  arquivo
+  link
+}
+
+model EventoMaterial {
+  id         String       @id @default(uuid())
+  tipo       TipoMaterial
+  titulo     String
+  url        String       // /uploads/materiais/{uuid}.ext (arquivo) ou URL externa (link)
+
+  evento_id  String
+  evento     Evento       @relation(fields: [evento_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime     @default(now())
+
+  @@index([evento_id])
+  @@map("evento_materiais")
 }
 
 // ─── Inscrição ───────────────────────────────────────────────────

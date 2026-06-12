@@ -77,4 +77,19 @@ export async function inscricoesRoutes(app: FastifyInstance) {
     await service.reenviarQrCheckin(id)
     return reply.send({ message: 'QR Code reenviado no WhatsApp' })
   })
+
+  // ── Certificado: download da própria inscrição (corretor) ──────
+  app.get('/:id/certificado', { preHandler: [authenticate, requireCorretor] }, async (req, reply) => {
+    const { id } = idParam.parse(req.params)
+    const { pdf, fileName } = await service.gerarCertificadoInscricao(id, req.user!.sub)
+    reply.header('Content-Type', 'application/pdf')
+    reply.header('Content-Disposition', `attachment; filename="${fileName}"`)
+    return reply.send(pdf)
+  })
+
+  // ── Certificado: envio em massa por WhatsApp (admin) ───────────
+  app.post('/certificados/enviar', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
+    const { evento_id } = z.object({ evento_id: z.string().uuid('evento_id inválido') }).parse(req.body)
+    return reply.send(await service.enviarCertificadosEvento(evento_id))
+  })
 }

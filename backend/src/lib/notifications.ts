@@ -9,7 +9,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { config } from '@/config'
-import { sendText, sendMedia } from '@/lib/evolution'
+import { sendText, sendMedia, sendDocument } from '@/lib/evolution'
 import { resolveMediaForSend } from '@/lib/storage'
 import { enqueueWhatsApp } from '@/lib/whatsapp-queue'
 
@@ -21,6 +21,7 @@ export type NotificacaoTipo =
   | 'checkin'
   | 'cancelamento_evento'
   | 'evento_novo'
+  | 'certificado'
 
 interface NotifyParams {
   corretorId:    string
@@ -71,6 +72,52 @@ export async function notify(params: NotifyParams): Promise<void> {
           status:      'erro',
           mensagem,
           erro:        err instanceof Error ? err.message : String(err),
+        },
+      })
+    }
+  })
+}
+
+interface NotifyDocParams {
+  corretorId: string
+  eventoId?:  string
+  tipo:       NotificacaoTipo
+  whatsapp:   string
+  optIn:      boolean
+  base64:     string   // documento (ex.: PDF) em base64
+  fileName:   string
+  caption:    string
+}
+
+/**
+ * Envia (ou simula) um documento (PDF) via WhatsApp e registra no log.
+ * Respeita o opt-in do corretor (LGPD).
+ */
+export async function notifyDocument(params: NotifyDocParams): Promise<void> {
+  const { corretorId, eventoId, tipo, whatsapp, optIn, base64, fileName, caption } = params
+  if (!optIn) return
+
+  if (!config.evolution.enabled) {
+    console.log(`[notify:stub doc] (${tipo}) → ${whatsapp} [${fileName}]`)
+    await prisma.notificacaoLog.create({
+      data: { corretor_id: corretorId, evento_id: eventoId, tipo, status: 'enviado', mensagem: caption },
+    })
+    return
+  }
+
+  enqueueWhatsApp(async () => {
+    try {
+      const digitos = whatsapp.replace(/\D/g, '')
+      const numero = digitos.startsWith('55') ? digitos : `55${digitos}`
+      await sendDocument(numero, base64, fileName, caption)
+      await prisma.notificacaoLog.create({
+        data: { corretor_id: corretorId, evento_id: eventoId, tipo, status: 'enviado', mensagem: caption },
+      })
+    } catch (err) {
+      await prisma.notificacaoLog.create({
+        data: {
+          corretor_id: corretorId, evento_id: eventoId, tipo, status: 'erro', mensagem: caption,
+          erro: err instanceof Error ? err.message : String(err),
         },
       })
     }

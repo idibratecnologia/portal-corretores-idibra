@@ -31,6 +31,7 @@ export const createEventoSchema = z.object({
   hora_fim:          z.string().regex(/^\d{2}:\d{2}$/, 'Formato HH:MM'),
   capacidade:        z.coerce.number().int().positive('Capacidade deve ser positiva'),
   inscricoes_abertas: z.boolean().optional(),
+  certificados_habilitados: z.boolean().optional(),
 })
 
 export const updateEventoSchema = createEventoSchema.partial()

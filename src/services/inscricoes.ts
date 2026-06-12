@@ -102,6 +102,33 @@ export async function exportarPresencaCsv(eventoId: string, nomeEvento?: string)
   URL.revokeObjectURL(url)
 }
 
+/** Corretor baixa o certificado de participação (PDF) de uma inscrição presente. */
+export async function baixarCertificado(inscricaoId: string, nomeEvento?: string): Promise<void> {
+  if (USE_MOCK) { console.log('[mock] baixarCertificado', inscricaoId); return }
+
+  const res = await fetch(`${apiBaseUrl}/inscricoes/${inscricaoId}/certificado`, {
+    headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+  })
+  if (!res.ok) {
+    const msg = await res.json().catch(() => null)
+    throw new Error(msg?.message || 'Não foi possível gerar o certificado.')
+  }
+  const blob = await res.blob()
+  const slug = (nomeEvento || 'evento').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase().slice(0, 40) || 'evento'
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = `certificado-${slug}.pdf`
+  document.body.appendChild(a); a.click(); a.remove()
+  URL.revokeObjectURL(url)
+}
+
+/** Admin envia os certificados por WhatsApp a todos os presentes do evento. */
+export async function enviarCertificadosEvento(eventoId: string): Promise<{ total: number; enfileirados: number; semOptIn: number }> {
+  if (USE_MOCK) return { total: 0, enfileirados: 0, semOptIn: 0 }
+  return api.post(`/inscricoes/certificados/enviar`, { evento_id: eventoId })
+}
+
 /** Admin reenvia o QR de check-in pelo WhatsApp do corretor. */
 export async function reenviarQrInscricao(inscricaoId: string): Promise<void> {
   if (USE_MOCK) {

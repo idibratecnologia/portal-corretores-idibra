@@ -117,3 +117,21 @@ export async function sendMedia(
     fileName,
   })
 }
+
+/** Envia um documento (ex.: PDF em base64) com legenda opcional. */
+export async function sendDocument(
+  numero: string,
+  base64: string,
+  fileName: string,
+  caption = '',
+  mimetype = 'application/pdf',
+): Promise<void> {
+  await call('POST', `/message/sendMedia/${INSTANCE}`, {
+    number:    numero,
+    mediatype: 'document',
+    mimetype,
+    media:     base64,
+    fileName,
+    caption,
+  })
+}

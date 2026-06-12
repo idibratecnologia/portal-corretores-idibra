@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Calendar, Clock, MapPin, Users, ExternalLink, QrCode, X, Loader2, Maximize2 } from 'lucide-react'
+import { Calendar, Clock, MapPin, Users, ExternalLink, QrCode, X, Loader2, Maximize2, Award } from 'lucide-react'
 import { BackButton } from '@/components/shared/BackButton'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { QrCodeCard } from '@/components/shared/QrCodeCard'
+import { EventoMateriais } from '@/components/shared/EventoMateriais'
 import { fetchEventoById } from '@/services/eventos'
-import { fetchMinhasInscricoes, createInscricao, cancelarInscricao } from '@/services/inscricoes'
+import { fetchMinhasInscricoes, createInscricao, cancelarInscricao, baixarCertificado } from '@/services/inscricoes'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/errors'
@@ -24,6 +25,7 @@ export function CorretorEventoDetalhes() {
   const [qrModal, setQrModal] = useState(false)
   const [bannerModal, setBannerModal] = useState(false)
   const [acting, setActing] = useState(false)
+  const [baixandoCert, setBaixandoCert] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!id) return
@@ -75,6 +77,18 @@ export function CorretorEventoDetalhes() {
       toast({ title: 'Não foi possível inscrever', description: getErrorMessage(err), variant: 'destructive' })
     } finally {
       setActing(false)
+    }
+  }
+
+  const handleBaixarCertificado = async () => {
+    if (!inscricao) return
+    setBaixandoCert(true)
+    try {
+      await baixarCertificado(inscricao.id, evento.titulo)
+    } catch (err) {
+      toast({ title: 'Certificado indisponível', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setBaixandoCert(false)
     }
   }
 
@@ -228,6 +242,18 @@ export function CorretorEventoDetalhes() {
                       Check-in realizado: {new Date(inscricao.checkin_at).toLocaleString('pt-BR')}
                     </p>
                   )}
+
+                  {inscricao?.status === 'presente' && evento.certificados_habilitados && (
+                    <Button
+                      variant="outline"
+                      className="w-full border-green-200 text-green-700 hover:bg-green-50 gap-2 rounded-xl"
+                      onClick={handleBaixarCertificado}
+                      disabled={baixandoCert}
+                    >
+                      {baixandoCert ? <Loader2 className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
+                      Baixar certificado
+                    </Button>
+                  )}
                 </>
               ) : (
                 <Button
@@ -242,6 +268,9 @@ export function CorretorEventoDetalhes() {
           </div>
         </div>
       </div>
+
+      {/* Materiais do evento (apenas para inscritos) */}
+      {isInscrito && id && <EventoMateriais eventoId={id} />}
 
       {/* QR Code Modal */}
       {qrModal && inscricao && (

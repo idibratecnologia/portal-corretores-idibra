@@ -5,8 +5,9 @@
 import { prisma } from '@/lib/prisma'
 import { config } from '@/config'
 import { NotFoundError, BadRequestError, ConflictError, ForbiddenError } from '@/lib/errors'
-import { notify } from '@/lib/notifications'
+import { notify, notifyDocument } from '@/lib/notifications'
 import { getConnectionState } from '@/lib/evolution'
+import { gerarCertificadoPdf } from '@/lib/certificado'
 import { renderMensagem } from '@/modules/templates/templates.service'
 import { gerarQrCheckinBase64 } from '@/lib/qrcode'
 import { toCsv } from '@/lib/csv'
@@ -151,6 +152,77 @@ export async function exportInscricoesCsv(eventoId: string): Promise<{ csv: stri
   ])
 
   return { csv: toCsv(headers, rows), titulo: evento.titulo }
+}
+
+// ─── Certificado de participação ─────────────────────────────────
+
+function slugArquivo(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase().slice(0, 40) || 'certificado'
+}
+
+/** Gera o PDF do certificado de uma inscrição (do corretor logado), se elegível. */
+export async function gerarCertificadoInscricao(
+  inscricaoId: string,
+  corretorId: string,
+): Promise<{ pdf: Buffer; fileName: string }> {
+  const insc = await prisma.inscricao.findUnique({
+    where:   { id: inscricaoId },
+    include: {
+      corretor: { select: { id: true, nome: true, creci: true } },
+      evento:   { select: { titulo: true, data_evento: true, local: true, certificados_habilitados: true } },
+    },
+  })
+  if (!insc) throw new NotFoundError('Inscrição não encontrada')
+  if (insc.corretor_id !== corretorId) throw new ForbiddenError('Acesso negado')
+  if (insc.status !== 'presente') throw new BadRequestError('Certificado disponível apenas para presença confirmada.')
+  if (!insc.evento.certificados_habilitados) throw new BadRequestError('Os certificados deste evento ainda não foram liberados.')
+
+  const pdf = await gerarCertificadoPdf({
+    nome: insc.corretor.nome, creci: insc.corretor.creci,
+    eventoTitulo: insc.evento.titulo, dataEvento: insc.evento.data_evento, local: insc.evento.local,
+  })
+  return { pdf, fileName: `certificado-${slugArquivo(insc.evento.titulo)}.pdf` }
+}
+
+/** Admin envia o certificado por WhatsApp a todos os presentes do evento (respeita opt-in). */
+export async function enviarCertificadosEvento(
+  eventoId: string,
+): Promise<{ total: number; enfileirados: number; semOptIn: number }> {
+  const evento = await prisma.evento.findUnique({
+    where:  { id: eventoId },
+    select: { titulo: true, data_evento: true, local: true, certificados_habilitados: true },
+  })
+  if (!evento) throw new NotFoundError('Evento não encontrado')
+  if (!evento.certificados_habilitados) throw new BadRequestError('Habilite os certificados do evento antes de enviar.')
+
+  const presentes = await prisma.inscricao.findMany({
+    where:   { evento_id: eventoId, status: 'presente' },
+    include: { corretor: { select: { id: true, nome: true, creci: true, whatsapp: true, whatsapp_opt_in: true } } },
+  })
+
+  const fileName = `certificado-${slugArquivo(evento.titulo)}.pdf`
+  let enfileirados = 0
+  let semOptIn = 0
+
+  for (const insc of presentes) {
+    const c = insc.corretor
+    if (!c.whatsapp_opt_in || !c.whatsapp) { semOptIn++; continue }
+
+    const pdf = await gerarCertificadoPdf({
+      nome: c.nome, creci: c.creci,
+      eventoTitulo: evento.titulo, dataEvento: evento.data_evento, local: evento.local,
+    })
+    await notifyDocument({
+      corretorId: c.id, eventoId, tipo: 'certificado',
+      whatsapp: c.whatsapp, optIn: true,
+      base64: pdf.toString('base64'), fileName,
+      caption: `🎓 Olá, ${c.nome}! Segue o seu certificado de participação no evento "${evento.titulo}". Obrigado por participar! — IDIBRA`,
+    })
+    enfileirados++
+  }
+
+  return { total: presentes.length, enfileirados, semOptIn }
 }
 
 // ─── Reenviar QR de check-in no WhatsApp (admin) ─────────────────

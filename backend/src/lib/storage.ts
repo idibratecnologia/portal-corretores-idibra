@@ -6,8 +6,8 @@
  * - Guarda no banco a URL pública completa (servida pelo Nginx em produção)
  */
 import { randomUUID } from 'crypto'
-import { mkdir, unlink, readFile } from 'fs/promises'
-import { join, resolve } from 'path'
+import { mkdir, unlink, readFile, writeFile } from 'fs/promises'
+import { join, resolve, extname } from 'path'
 import sharp from 'sharp'
 import { config } from '@/config'
 
@@ -45,6 +45,27 @@ export async function saveImage(kind: ImageKind, buffer: Buffer): Promise<string
 
   // URL pública: https://api.idibra.com.br/uploads/fotos/uuid.webp
   return `${config.upload.apiUrl}/uploads/${kind}/${filename}`
+}
+
+/** Extensões permitidas para materiais de evento. */
+export const MATERIAL_EXTENSOES = [
+  '.pdf', '.png', '.jpg', '.jpeg', '.webp', '.gif',
+  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.zip',
+]
+
+/**
+ * Salva um arquivo genérico (material de evento) preservando a extensão.
+ * Retorna a URL pública completa. Valide a extensão antes de chamar.
+ */
+export async function saveRawFile(buffer: Buffer, originalName: string): Promise<string> {
+  const dir = join(resolve(config.upload.dir), 'materiais')
+  await mkdir(dir, { recursive: true })
+
+  const ext = (extname(originalName) || '').toLowerCase().replace(/[^.a-z0-9]/g, '')
+  const filename = `${randomUUID()}${ext}`
+  await writeFile(join(dir, filename), buffer)
+
+  return `${config.upload.apiUrl}/uploads/materiais/${filename}`
 }
 
 /**

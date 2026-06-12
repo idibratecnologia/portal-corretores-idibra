@@ -67,11 +67,21 @@ export interface Evento {
   banner_url?: string
   status: StatusEvento
   inscricoes_abertas: boolean
+  certificados_habilitados?: boolean
   criado_por?: string
   created_at: string
   updated_at: string
   total_inscritos?: number
   total_presentes?: number
+}
+
+export interface EventoMaterial {
+  id: string
+  evento_id: string
+  tipo: 'arquivo' | 'link'
+  titulo: string
+  url: string
+  created_at: string
 }
 
 export interface EventoInscricao {

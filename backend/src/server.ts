@@ -29,6 +29,7 @@ import { templatesRoutes } from '@/modules/templates/templates.routes'
 import { notificationsRoutes } from '@/modules/notifications/notifications.routes'
 import { importRoutes } from '@/modules/import/import.routes'
 import { usuariosRoutes } from '@/modules/usuarios/usuarios.routes'
+import { materiaisRoutes } from '@/modules/materiais/materiais.routes'
 import { seedTemplates } from '@/modules/templates/templates.service'
 import { agendarLembretes } from '@/jobs/lembretes'
 
@@ -153,6 +154,7 @@ async function buildServer() {
   await app.register(notificationsRoutes, { prefix: '/notifications' })
   await app.register(importRoutes,       { prefix: '/import' })
   await app.register(usuariosRoutes,     { prefix: '/usuarios' })
+  await app.register(materiaisRoutes)
 
   return app
 }

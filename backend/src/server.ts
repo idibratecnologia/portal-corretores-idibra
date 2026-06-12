@@ -30,7 +30,7 @@ import { notificationsRoutes } from '@/modules/notifications/notifications.route
 import { importRoutes } from '@/modules/import/import.routes'
 import { usuariosRoutes } from '@/modules/usuarios/usuarios.routes'
 import { materiaisRoutes } from '@/modules/materiais/materiais.routes'
-import { logsRoutes } from '@/modules/logs/logs.routes'
+import { logsRoutes } from '@/modules/auditoria/auditoria.routes'
 import { seedTemplates } from '@/modules/templates/templates.service'
 import { agendarLembretes } from '@/jobs/lembretes'
 

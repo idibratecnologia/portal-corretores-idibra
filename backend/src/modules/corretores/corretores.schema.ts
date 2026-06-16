@@ -30,7 +30,8 @@ export const createCorretorSchema = z.object({
                      .transform((d) => d ? new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0)) : d),
   cidade:         z.string().min(1, 'Cidade obrigatória'),
   uf:             z.string().length(2, 'UF inválida'),
-  imobiliaria_id: z.string().uuid().optional(),
+  // Aceita '' (nenhuma imobiliária) tratando como null
+  imobiliaria_id: z.preprocess((v) => (v === '' ? null : v), z.string().uuid().nullable().optional()),
   observacoes_admin: z.string().optional(),
 })
 

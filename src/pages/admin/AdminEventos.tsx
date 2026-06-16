@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { fetchEventos, createEvento, updateEvento, setEventoStatus, uploadBannerEvento, deleteEvento } from '@/services/eventos'
 import { useAuth } from '@/contexts/AuthContext'
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -104,6 +105,7 @@ export function AdminEventos() {
   }
 
   useEffect(() => { loadEventos() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useRealtimeRefresh(loadEventos)
 
   const toggleSort = (field: SortFieldE) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))

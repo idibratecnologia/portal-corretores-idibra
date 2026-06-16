@@ -11,6 +11,7 @@ const cadastroBase = {
   email: 'novo@email.com', senha: 'senha123',
   telefone: '(11) 90000-0000', whatsapp: '(11) 90000-0000',
   cidade: 'São Paulo', uf: 'sp', whatsapp_opt_in: false,
+  data_nascimento: new Date('1990-05-20T12:00:00Z'),
 }
 
 describe('auth.login', () => {

@@ -66,6 +66,7 @@ export interface CadastroData {
   nome: string; cpf: string; creci: string; email: string; senha: string
   telefone: string; whatsapp: string; instagram?: string
   imobiliaria_id?: string; cidade: string; uf: string
+  data_nascimento?: string
   whatsapp_opt_in?: boolean
 }
 

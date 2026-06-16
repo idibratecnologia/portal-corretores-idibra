@@ -8,6 +8,7 @@ import {
 import type { TooltipProps } from 'recharts'
 import { StatCard } from '@/components/shared/StatCard'
 import { fetchDashboard } from '@/services/relatorios'
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh'
 import type { DashboardData } from '@/services/relatorios'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -46,9 +47,9 @@ export function AdminDashboard() {
   const navigate = useNavigate()
   const [data, setData] = useState<DashboardData | null>(null)
 
-  useEffect(() => {
-    fetchDashboard().then(setData).catch(() => {})
-  }, [])
+  const carregar = () => { fetchDashboard().then(setData).catch(() => {}) }
+  useEffect(() => { carregar() }, [])
+  useRealtimeRefresh(carregar)
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'

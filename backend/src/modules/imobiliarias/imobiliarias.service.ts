@@ -4,6 +4,7 @@
 import { prisma } from '@/lib/prisma'
 import { NotFoundError, ConflictError } from '@/lib/errors'
 import { saveImage, deleteImage } from '@/lib/storage'
+import { emitAdminRefresh } from '@/lib/events'
 import type { CreateImobiliariaInput, UpdateImobiliariaInput } from './imobiliarias.schema'
 
 /**
@@ -59,7 +60,7 @@ export async function createImobiliaria(input: CreateImobiliariaInput) {
   const existing = await prisma.imobiliaria.findUnique({ where: { cnpj: input.cnpj } })
   if (existing) throw new ConflictError('CNPJ já cadastrado')
 
-  return prisma.imobiliaria.create({
+  const imob = await prisma.imobiliaria.create({
     data: {
       nome:     input.nome,
       cnpj:     input.cnpj,
@@ -69,6 +70,8 @@ export async function createImobiliaria(input: CreateImobiliariaInput) {
       uf:       input.uf.toUpperCase(),
     },
   })
+  emitAdminRefresh('imobiliaria-criada')
+  return imob
 }
 
 export async function updateImobiliaria(id: string, input: UpdateImobiliariaInput) {
@@ -82,7 +85,7 @@ export async function updateImobiliaria(id: string, input: UpdateImobiliariaInpu
     if (dup) throw new ConflictError('CNPJ já cadastrado em outra imobiliária')
   }
 
-  return prisma.imobiliaria.update({
+  const imob = await prisma.imobiliaria.update({
     where: { id },
     data: {
       ...input,
@@ -90,11 +93,15 @@ export async function updateImobiliaria(id: string, input: UpdateImobiliariaInpu
       uf:    input.uf ? input.uf.toUpperCase() : undefined,
     },
   })
+  emitAdminRefresh('imobiliaria-atualizada')
+  return imob
 }
 
 export async function setStatus(id: string, status: 'ativa' | 'inativa') {
   await ensureExists(id)
-  return prisma.imobiliaria.update({ where: { id }, data: { status } })
+  const imob = await prisma.imobiliaria.update({ where: { id }, data: { status } })
+  emitAdminRefresh('imobiliaria-status')
+  return imob
 }
 
 /**
@@ -131,6 +138,7 @@ export async function deleteImobiliaria(id: string) {
 
   await prisma.imobiliaria.delete({ where: { id } })
   await deleteImage(imob.logo_url) // remove a logo do storage (evita arquivo órfão)
+  emitAdminRefresh('imobiliaria-excluida')
   return { nome: imob.nome }
 }
 

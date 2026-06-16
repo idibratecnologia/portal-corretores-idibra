@@ -35,6 +35,17 @@ function maskCRECI(v: string) {
   return v.replace(/[^a-zA-Z0-9-/]/g, '').slice(0, 15).toUpperCase()
 }
 
+/** Idade completa (anos) a partir de uma data "YYYY-MM-DD". */
+function calcularIdade(iso: string): number {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return 0
+  const hoje = new Date()
+  let idade = hoje.getFullYear() - d.getFullYear()
+  const m = hoje.getMonth() - d.getMonth()
+  if (m < 0 || (m === 0 && hoje.getDate() < d.getDate())) idade--
+  return idade
+}
+
 // ── Field helpers ──────────────────────────────────────────────────────────
 function Field({ icon: Icon, error, ...props }: any) {
   return (
@@ -66,9 +77,11 @@ export function CadastroPage() {
   const [form, setForm] = useState({
     nome: '', cpf: '', creci: '', email: '',
     telefone: '', whatsapp: '', instagram: '',
-    imobiliaria_id: '', cidade: '', uf: 'SP',
+    imobiliaria_id: '', cidade: '', uf: 'CE',
+    data_nascimento: '',
     password: '', confirmPassword: '',
     whatsapp_opt_in: true,   // consentimento LGPD para receber notificações
+    aceite_idade: false,     // declaração de maioridade
   })
 
   const set = (key: keyof typeof form, mask?: (v: string) => string) =>
@@ -87,8 +100,14 @@ export function CadastroPage() {
     if (form.telefone.replace(/\D/g,'').length < 10) errs.telefone = 'Telefone inválido'
     if (form.whatsapp.replace(/\D/g,'').length < 10) errs.whatsapp = 'WhatsApp inválido'
     if (!form.cidade.trim())                    errs.cidade    = 'Cidade obrigatória'
+    if (!form.data_nascimento) {
+      errs.data_nascimento = 'Data de nascimento obrigatória'
+    } else if (calcularIdade(form.data_nascimento) < 18) {
+      errs.data_nascimento = 'É necessário ter 18 anos ou mais'
+    }
     if (form.password.length < 8)               errs.password  = 'Mínimo 8 caracteres'
     if (form.password !== form.confirmPassword)  errs.confirmPassword = 'Senhas não conferem'
+    if (!form.aceite_idade)                      errs.aceite_idade = 'Confirme a declaração para continuar'
     setFieldErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -112,6 +131,7 @@ export function CadastroPage() {
         imobiliaria_id: form.imobiliaria_id || undefined,
         cidade:   form.cidade,
         uf:       form.uf,
+        data_nascimento: form.data_nascimento,
         whatsapp_opt_in: form.whatsapp_opt_in,
       })
       setSuccess(true)
@@ -286,6 +306,19 @@ export function CadastroPage() {
                 </select>
               </div>
 
+              {/* Data de nascimento */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1 pl-1">Data de nascimento *</label>
+                <input
+                  type="date"
+                  value={form.data_nascimento}
+                  onChange={set('data_nascimento')}
+                  max={new Date().toISOString().slice(0, 10)}
+                  className={`${inputCls} ${fieldErrors.data_nascimento ? 'border-red-300' : ''}`}
+                />
+                {fieldErrors.data_nascimento && <p className="text-xs text-red-500 mt-1 pl-1">{fieldErrors.data_nascimento}</p>}
+              </div>
+
               {/* Senha */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -357,6 +390,25 @@ export function CadastroPage() {
                   Você pode revogar o consentimento a qualquer momento no seu perfil.
                 </span>
               </label>
+
+              {/* Declaração de maioridade */}
+              <div>
+                <label className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${fieldErrors.aceite_idade ? 'border-red-300 bg-red-50/40' : 'border-gray-200 bg-gray-50/60 hover:bg-gray-100/60'}`}>
+                  <input
+                    type="checkbox"
+                    checked={form.aceite_idade}
+                    onChange={(e) => {
+                      setForm((prev) => ({ ...prev, aceite_idade: e.target.checked }))
+                      if (fieldErrors.aceite_idade) setFieldErrors((prev) => { const n = { ...prev }; delete n.aceite_idade; return n })
+                    }}
+                    className="mt-0.5 w-4 h-4 rounded accent-green-600 flex-shrink-0"
+                  />
+                  <span className="text-[11px] text-gray-600 leading-snug">
+                    Declaro que informei minha <strong>data de nascimento</strong> corretamente e que tenho <strong>18 anos ou mais</strong>, condição necessária para o cadastro.
+                  </span>
+                </label>
+                {fieldErrors.aceite_idade && <p className="text-xs text-red-500 mt-1 pl-1">{fieldErrors.aceite_idade}</p>}
+              </div>
 
               {error && (
                 <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-xs text-red-600 font-medium flex items-center gap-2">

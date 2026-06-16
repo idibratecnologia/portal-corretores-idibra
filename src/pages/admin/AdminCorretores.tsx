@@ -16,6 +16,7 @@ import { fetchCorretores, createCorretor, updateCorretor, setCorretorStatus, del
 import { fetchImobiliarias } from '@/services/imobiliarias'
 import { PENDING_CHANGED_EVENT } from '@/components/admin/AdminSidebar'
 import { useAuth } from '@/contexts/AuthContext'
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh'
 import { useToast } from '@/hooks/use-toast'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { getErrorMessage } from '@/lib/errors'
@@ -83,6 +84,7 @@ export function AdminCorretores() {
   }, [toast])
 
   useEffect(() => { loadData() }, [loadData])
+  useRealtimeRefresh(loadData)
 
   const toggleSort = (field: SortFieldC) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))

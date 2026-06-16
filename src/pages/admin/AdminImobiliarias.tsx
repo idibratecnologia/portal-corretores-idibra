@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { getErrorMessage } from '@/lib/errors'
 import { useAuth } from '@/contexts/AuthContext'
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh'
 import type { Imobiliaria } from '@/types'
 
 export function AdminImobiliarias() {
@@ -45,6 +46,7 @@ export function AdminImobiliarias() {
   }, [toast])
 
   useEffect(() => { loadData() }, [loadData])
+  useRealtimeRefresh(loadData)
 
   const filtered = imobiliarias.filter((i) =>
     i.nome.toLowerCase().includes(debouncedSearch.toLowerCase()) ||

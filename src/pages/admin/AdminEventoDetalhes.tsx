@@ -13,6 +13,7 @@ import { fetchEventoById, updateEvento } from '@/services/eventos'
 import { fetchInscricoesByEvento, realizarCheckin, setInscricaoStatus, reenviarQrInscricao, exportarPresencaCsv, enviarCertificadosEvento } from '@/services/inscricoes'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh'
 import { getErrorMessage } from '@/lib/errors'
 import type { Evento, EventoInscricao } from '@/types'
 
@@ -53,6 +54,7 @@ export function AdminEventoDetalhes() {
   }, [id])
 
   useEffect(() => { loadData() }, [loadData])
+  useRealtimeRefresh(loadData)
 
   if (isLoading) {
     return (

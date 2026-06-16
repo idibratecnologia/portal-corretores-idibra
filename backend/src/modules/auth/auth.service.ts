@@ -93,6 +93,7 @@ export async function cadastrarCorretor(input: CadastroInput): Promise<{ id: str
       whatsapp:        input.whatsapp,
       whatsapp_opt_in: input.whatsapp_opt_in ?? false,
       instagram:       input.instagram,
+      data_nascimento: input.data_nascimento,
       cidade:          input.cidade,
       uf:              input.uf.toUpperCase(),
       imobiliaria_id:  input.imobiliaria_id,

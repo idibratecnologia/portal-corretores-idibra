@@ -8,6 +8,7 @@ import { NotFoundError, BadRequestError, ConflictError, ForbiddenError } from '@
 import { notify, notifyDocument } from '@/lib/notifications'
 import { getConnectionState } from '@/lib/evolution'
 import { gerarCertificadoPdf } from '@/lib/certificado'
+import { emitAdminRefresh } from '@/lib/events'
 import { renderMensagem } from '@/modules/templates/templates.service'
 import { gerarQrCheckinBase64 } from '@/lib/qrcode'
 import { toCsv } from '@/lib/csv'
@@ -109,6 +110,7 @@ export async function createInscricao(corretorId: string, eventoId: string) {
     })
   }
 
+  emitAdminRefresh('inscricao-nova')
   return inscricao
 }
 
@@ -282,6 +284,7 @@ export async function cancelarInscricao(inscricaoId: string, requesterId: string
   }
 
   await prisma.inscricao.update({ where: { id: inscricaoId }, data: { status: 'cancelado' } })
+  emitAdminRefresh('inscricao-cancelada')
 }
 
 // ─── Check-in por QR token ───────────────────────────────────────
@@ -317,6 +320,7 @@ export async function realizarCheckin(token: string, adminId: string): Promise<C
     })
   }
 
+  emitAdminRefresh('checkin')
   return { ok: true, inscricao: atualizada }
 }
 
@@ -330,7 +334,7 @@ export async function setStatusManual(
   const inscricao = await prisma.inscricao.findUnique({ where: { id: inscricaoId } })
   if (!inscricao) throw new NotFoundError('Inscrição não encontrada')
 
-  return prisma.inscricao.update({
+  const atualizada = await prisma.inscricao.update({
     where: { id: inscricaoId },
     data: {
       status,
@@ -339,6 +343,8 @@ export async function setStatusManual(
     },
     include: inscricaoInclude,
   })
+  emitAdminRefresh('inscricao-status')
+  return atualizada
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────

@@ -47,6 +47,19 @@ function daysFromNow(dateStr: string) {
   )
 }
 
+/** Dias até o próximo aniversário (0 = hoje). Datas são armazenadas em UTC. */
+function daysUntilBirthday(dateStr: string): number {
+  const nasc = new Date(dateStr)
+  if (isNaN(nasc.getTime())) return -1
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+  const mes = nasc.getUTCMonth()
+  const dia = nasc.getUTCDate()
+  let prox = new Date(hoje.getFullYear(), mes, dia)
+  prox.setHours(0, 0, 0, 0)
+  if (prox.getTime() < hoje.getTime()) prox = new Date(hoje.getFullYear() + 1, mes, dia)
+  return Math.round((prox.getTime() - hoje.getTime()) / 86_400_000)
+}
+
 /**
  * Monta as notificações do admin a partir de dados reais da API:
  *  - corretores pendentes de aprovação
@@ -58,9 +71,10 @@ function daysFromNow(dateStr: string) {
 async function buildAdminNotifications(): Promise<AppNotification[]> {
   const list: AppNotification[] = []
 
-  const [pendentesRes, eventosRes] = await Promise.all([
+  const [pendentesRes, eventosRes, ativosRes] = await Promise.all([
     fetchCorretores({ status: 'pendente', limit: 100 }),
     fetchEventos({ status: 'publicado', limit: 100 }),
+    fetchCorretores({ status: 'ativo', limit: 1000 }),
   ])
 
   const pendentes = pendentesRes.data
@@ -98,6 +112,43 @@ async function buildAdminNotifications(): Promise<AppNotification[]> {
       href: `/admin/eventos/${e.id}`,
     })
   })
+
+  // Aniversariantes (hoje e próximos 7 dias)
+  const aniversariantes = ativosRes.data
+    .filter((c) => c.data_nascimento)
+    .map((c) => ({ ...c, dias: daysUntilBirthday(c.data_nascimento as string) }))
+    .filter((c) => c.dias >= 0 && c.dias <= 7)
+    .sort((a, b) => a.dias - b.dias)
+
+  const aniversariantesHoje = aniversariantes.filter((c) => c.dias === 0)
+  const aniversariantesProximos = aniversariantes.filter((c) => c.dias > 0)
+
+  if (aniversariantesHoje.length > 0) {
+    const nomes = aniversariantesHoje.map((c) => c.nome.split(' ')[0]).join(', ')
+    list.push({
+      id: `bday:today:${aniversariantesHoje.map((c) => c.id).sort().join('|')}`,
+      icon: 'bell',
+      title: `🎂 Aniversário hoje: ${aniversariantesHoje.length > 1 ? `${aniversariantesHoje.length} corretores` : aniversariantesHoje[0].nome}`,
+      body: nomes,
+      time: 'hoje',
+      read: false,
+      href: '/admin/corretores',
+    })
+  }
+
+  if (aniversariantesProximos.length > 0) {
+    const nomes = aniversariantesProximos.slice(0, 3).map((c) => `${c.nome.split(' ')[0]} (${c.dias}d)`).join(', ')
+    const extra = aniversariantesProximos.length > 3 ? ` e mais ${aniversariantesProximos.length - 3}` : ''
+    list.push({
+      id: `bday:soon:${aniversariantesProximos.map((c) => `${c.id}:${c.dias}`).sort().join('|')}`,
+      icon: 'bell',
+      title: `${aniversariantesProximos.length} aniversariante(s) nos próximos 7 dias`,
+      body: nomes + extra,
+      time: 'em breve',
+      read: false,
+      href: '/admin/corretores',
+    })
+  }
 
   return list
 }
@@ -153,7 +204,13 @@ export function useNotifications(role: 'admin' | 'corretor') {
       const token = getToken()
       if (!token) return
       es = new EventSource(`${apiBaseUrl}/notifications/stream?token=${encodeURIComponent(token)}`)
-      es.addEventListener('refresh', () => load())
+      es.addEventListener('refresh', (ev) => {
+        load()
+        // Propaga para as telas (listas) atualizarem em tempo real
+        let motivo = ''
+        try { motivo = JSON.parse((ev as MessageEvent).data)?.motivo ?? '' } catch { /* ignora */ }
+        window.dispatchEvent(new CustomEvent('idibra:realtime', { detail: motivo }))
+      })
       es.onerror = () => {
         // Fecha e reagenda a reconexão lendo um token atualizado
         es?.close()

@@ -3,6 +3,15 @@
  */
 import { z } from 'zod'
 
+/** Idade completa (em anos) a partir da data de nascimento. */
+function calcularIdade(d: Date): number {
+  const hoje = new Date()
+  let idade = hoje.getFullYear() - d.getFullYear()
+  const m = hoje.getMonth() - d.getMonth()
+  if (m < 0 || (m === 0 && hoje.getDate() < d.getDate())) idade--
+  return idade
+}
+
 // ─── Login ────────────────────────────────────────────────────────
 
 export const loginSchema = z.object({
@@ -24,6 +33,9 @@ export const cadastroSchema = z.object({
   whatsapp:       z.string().min(14, 'WhatsApp inválido'),
   whatsapp_opt_in: z.boolean().optional().default(false),
   instagram:      z.string().optional(),
+  data_nascimento: z.coerce.date({ errorMap: () => ({ message: 'Data de nascimento obrigatória' }) })
+                     .refine((d) => calcularIdade(d) >= 18, 'É necessário ter 18 anos ou mais para se cadastrar')
+                     .transform((d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0))),
   cidade:         z.string().min(1, 'Cidade obrigatória'),
   uf:             z.string().length(2, 'UF inválida'),
   imobiliaria_id: z.string().uuid().optional(),

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Mail, Phone, MessageCircle, Instagram, MapPin, Building2,
-  Calendar, CheckCircle, XCircle, Clock, Edit2, UserCheck, UserX, Loader2, Lock, Copy,
+  Calendar, CheckCircle, XCircle, Clock, Edit2, UserCheck, UserX, Loader2, Lock, Copy, Cake,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BackButton } from '@/components/shared/BackButton'
@@ -235,6 +235,12 @@ export function AdminCorretorPerfil() {
                 <div className="flex items-center gap-2 text-gray-600">
                   <Building2 className="w-4 h-4 text-green-600 flex-shrink-0" />
                   <span>{corretor.imobiliaria.nome}</span>
+                </div>
+              )}
+              {corretor.data_nascimento && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Cake className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <span>{new Date(corretor.data_nascimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
                 </div>
               )}
             </div>

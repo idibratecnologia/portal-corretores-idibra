@@ -8,6 +8,7 @@ import { fetchCorretores, setCorretorStatus } from '@/services/corretores'
 import { PENDING_CHANGED_EVENT } from '@/components/admin/AdminSidebar'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh'
 import { getErrorMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 import type { Corretor } from '@/types'
@@ -33,6 +34,7 @@ export function AdminAprovacoes() {
   }, [toast])
 
   useEffect(() => { loadPendentes() }, [loadPendentes])
+  useRealtimeRefresh(loadPendentes)
 
   const handleAction = async (id: string, action: 'ativo' | 'bloqueado') => {
     const corretor = pendentes.find((c) => c.id === id)

@@ -95,7 +95,7 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
         whatsapp_opt_in: corretor.whatsapp_opt_in ?? false,
       })
     } else {
-      reset({ whatsapp_opt_in: true })   // novo corretor já nasce apto a receber (admin pode desmarcar)
+      reset({ whatsapp_opt_in: true, uf: 'CE' })   // novo corretor já nasce apto a receber (admin pode desmarcar)
     }
   }, [corretor, reset])
 

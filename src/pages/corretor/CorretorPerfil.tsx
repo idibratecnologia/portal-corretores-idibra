@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { User, Mail, Phone, MessageCircle, Instagram, MapPin, Building2, Save, Camera, Loader2, ImageOff, Lock } from 'lucide-react'
+import { User, Mail, Phone, MessageCircle, Instagram, MapPin, Building2, Save, Camera, Loader2, ImageOff, Lock, Cake } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -41,6 +41,7 @@ const schema = z.object({
   cidade: z.string().min(1, 'Cidade obrigatória'),
   uf: z.string().min(2, 'UF obrigatória'),
   instagram: z.string().optional(),
+  data_nascimento: z.string().optional(),
 })
 
 type FormData = z.infer<typeof schema>
@@ -78,6 +79,7 @@ export function CorretorPerfil() {
       cidade: corretor?.cidade || '',
       uf: corretor?.uf || 'SP',
       instagram: corretor?.instagram || '',
+      data_nascimento: corretor?.data_nascimento ? corretor.data_nascimento.slice(0, 10) : '',
     },
   })
 
@@ -149,6 +151,7 @@ export function CorretorPerfil() {
           cidade:         data.cidade,
           uf:             data.uf,
           instagram:      data.instagram,
+          data_nascimento: data.data_nascimento || null,
         })
       }
       toast({ title: 'Perfil atualizado!', description: 'Suas informações foram salvas com sucesso.' })
@@ -332,9 +335,14 @@ export function CorretorPerfil() {
                 </select>
               </div>
 
-              <div className="sm:col-span-2">
+              <div>
                 <Label>Instagram</Label>
                 <Input {...register('instagram')} placeholder="@usuario" className="mt-1" />
+              </div>
+
+              <div>
+                <Label>Data de nascimento</Label>
+                <Input type="date" {...register('data_nascimento')} className="mt-1" />
               </div>
             </div>
 
@@ -366,6 +374,7 @@ export function CorretorPerfil() {
               { icon: Phone,         label: 'Telefone',   value: corretor?.telefone, href: corretor?.telefone ? `tel:+55${corretor.telefone.replace(/\D/g, '')}` : undefined },
               { icon: MessageCircle, label: 'WhatsApp',   value: corretor?.whatsapp, href: corretor?.whatsapp ? `https://wa.me/55${corretor.whatsapp.replace(/\D/g, '')}` : undefined, external: true },
               { icon: Instagram,     label: 'Instagram',  value: corretor?.instagram || '—' },
+              { icon: Cake,          label: 'Aniversário', value: corretor?.data_nascimento ? new Date(corretor.data_nascimento).toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }) : '—' },
               { icon: Building2,     label: 'Imobiliária',value: imobiliaria?.nome || '—' },
               { icon: MapPin,        label: 'Cidade/UF',  value: `${corretor?.cidade}/${corretor?.uf}` },
             ].map((item) => (

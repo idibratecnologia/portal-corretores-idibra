@@ -10,8 +10,9 @@ import { z } from 'zod'
 import { config } from '@/config'
 import * as evolution from '@/lib/evolution'
 import { whatsappQueueSize } from '@/lib/whatsapp-queue'
-import { enviarTesteEvento, enviarTesteTexto } from './whatsapp.service'
+import { enviarTesteEvento, enviarTesteTexto, broadcast } from './whatsapp.service'
 import { authenticate, requireAdmin } from '@/middlewares/auth.middleware'
+import { audit } from '@/lib/audit'
 
 const testeSchema = z.object({
   numero:     z.string().min(8, 'Número inválido'),
@@ -63,5 +64,16 @@ export async function whatsappRoutes(app: FastifyInstance) {
     }
     await enviarTesteTexto(numero, texto || 'Mensagem de teste do Portal IDIBRA ✅')
     return reply.send({ message: 'Mensagem de teste enviada' })
+  })
+
+  // Disparo em massa (respeita opt-in e a fila)
+  app.post('/broadcast', async (req, reply) => {
+    const { mensagem, corretor_ids } = z.object({
+      mensagem:     z.string().trim().min(1, 'Mensagem obrigatória'),
+      corretor_ids: z.array(z.string().uuid()).min(1, 'Selecione ao menos um corretor'),
+    }).parse(req.body)
+    const r = await broadcast(mensagem, corretor_ids)
+    audit(req, 'enviou', 'broadcast', null, `${r.enfileirados} corretor(es)`, mensagem.slice(0, 120))
+    return reply.send(r)
   })
 }

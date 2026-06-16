@@ -44,6 +44,7 @@ export interface Corretor {
   cidade: string
   uf: string
   instagram?: string
+  data_nascimento?: string | null
   status: StatusCorretor
   observacoes_admin?: string
   created_at: string
@@ -68,6 +69,8 @@ export interface Evento {
   status: StatusEvento
   inscricoes_abertas: boolean
   certificados_habilitados?: boolean
+  exclusivo?: boolean
+  convidados_ids?: string[]
   criado_por?: string
   created_at: string
   updated_at: string

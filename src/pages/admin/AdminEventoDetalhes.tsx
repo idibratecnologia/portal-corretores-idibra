@@ -8,6 +8,7 @@ import { StatCard } from '@/components/shared/StatCard'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { QrScanner } from '@/components/shared/QrScanner'
 import { EventoMateriais } from '@/components/shared/EventoMateriais'
+import { ShareEventoButton } from '@/components/shared/ShareEventoButton'
 import { fetchEventoById, updateEvento } from '@/services/eventos'
 import { fetchInscricoesByEvento, realizarCheckin, setInscricaoStatus, reenviarQrInscricao, exportarPresencaCsv, enviarCertificadosEvento } from '@/services/inscricoes'
 import { formatDate, formatDateTime } from '@/lib/utils'
@@ -191,8 +192,12 @@ export function AdminEventoDetalhes() {
             {evento.tipo && (
               <span className="text-sm text-gray-500 capitalize">{evento.tipo}</span>
             )}
+            {evento.exclusivo && (
+              <span className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full">Exclusivo</span>
+            )}
           </div>
         </div>
+        {!evento.exclusivo && id && <ShareEventoButton eventoId={id} titulo={evento.titulo} />}
       </div>
 
       {/* Evento info */}

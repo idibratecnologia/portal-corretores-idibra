@@ -13,6 +13,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/admin/imobiliarias': { title: 'Imobiliárias',     subtitle: 'Gestão de imobiliárias parceiras' },
   '/admin/relatorios':   { title: 'Relatórios',       subtitle: 'Análise e exportação de dados' },
   '/admin/notificacoes': { title: 'Notificações',     subtitle: 'Central de mensagens e gatilhos' },
+  '/admin/disparos':     { title: 'Disparos',         subtitle: 'Envio em massa por WhatsApp' },
   '/admin/usuarios':     { title: 'Usuários',         subtitle: 'Administradores e operadores' },
   '/admin/logs':         { title: 'Logs',             subtitle: 'Auditoria de ações' },
   '/admin/configuracoes':{ title: 'Configurações',    subtitle: 'Configurações gerais do sistema' },

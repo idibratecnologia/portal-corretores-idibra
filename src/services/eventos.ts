@@ -1,9 +1,31 @@
-import { api } from '@/lib/api'
+import { api, apiBaseUrl } from '@/lib/api'
 import type { Paginated } from '@/lib/api'
 import { mockEventos } from '@/data/mockData'
 import type { Evento } from '@/types'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
+
+export interface EventoPublico {
+  id: string
+  titulo: string
+  descricao: string
+  tipo: string
+  empreendimento?: string | null
+  banner_url?: string | null
+  data_evento: string
+  hora_inicio: string
+  hora_fim: string
+  local: string
+  endereco: string
+  link_maps?: string | null
+}
+
+/** Busca os dados públicos de um evento (sem login) para a página de compartilhamento. */
+export async function fetchEventoPublico(id: string): Promise<EventoPublico> {
+  const res = await fetch(`${apiBaseUrl}/public/eventos/${id}`)
+  if (!res.ok) throw new Error('Evento não encontrado')
+  return res.json()
+}
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -63,7 +85,7 @@ export async function fetchEventoById(id: string): Promise<Evento> {
 // ─── Mutações ────────────────────────────────────────────────────
 
 export async function createEvento(
-  data: Omit<Evento, 'id' | 'created_at' | 'updated_at' | 'total_inscritos' | 'total_presentes' | 'status'>,
+  data: Omit<Evento, 'id' | 'created_at' | 'updated_at' | 'total_inscritos' | 'total_presentes' | 'status'> & { convidados?: string[] },
 ): Promise<Evento> {
   if (USE_MOCK) {
     const now = new Date().toISOString()
@@ -73,7 +95,7 @@ export async function createEvento(
   return api.post<Evento>('/eventos', data)
 }
 
-export async function updateEvento(id: string, data: Partial<Evento>): Promise<Evento> {
+export async function updateEvento(id: string, data: Partial<Evento> & { convidados?: string[] }): Promise<Evento> {
   if (USE_MOCK) {
     console.log('[mock] updateEvento', id, data)
     const e = mockEventos.find((e) => e.id === id)!

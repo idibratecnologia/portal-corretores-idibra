@@ -22,6 +22,7 @@ export type NotificacaoTipo =
   | 'cancelamento_evento'
   | 'evento_novo'
   | 'certificado'
+  | 'broadcast'
 
 interface NotifyParams {
   corretorId:    string

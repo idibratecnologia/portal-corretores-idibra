@@ -100,6 +100,7 @@ model Corretor {
   whatsapp          String
   whatsapp_opt_in   Boolean        @default(false)   // LGPD: consentiu receber notificações
   instagram         String?
+  data_nascimento   DateTime?      // Aniversário do corretor
   cidade            String
   uf                String         @db.Char(2)
   status            StatusCorretor @default(pendente)
@@ -111,6 +112,7 @@ model Corretor {
 
   inscricoes        Inscricao[]
   notificacoes      NotificacaoLog[]
+  convites          EventoConvidado[]
 
   created_at        DateTime       @default(now())
   updated_at        DateTime       @updatedAt
@@ -139,10 +141,12 @@ model Evento {
   status             StatusEvento @default(rascunho)
   inscricoes_abertas Boolean      @default(true)
   certificados_habilitados Boolean @default(false)  // Admin libera a emissão de certificados
+  exclusivo          Boolean      @default(false)   // Visível/notificado só para corretores convidados
 
   inscricoes         Inscricao[]
   notificacoes       NotificacaoLog[]
   materiais          EventoMaterial[]
+  convidados         EventoConvidado[]
 
   created_at         DateTime     @default(now())
   updated_at         DateTime     @updatedAt
@@ -223,6 +227,21 @@ model NotificacaoLog {
   @@map("notificacoes_log")
 }
 
+// ─── Convidados de evento exclusivo ──────────────────────────────
+
+model EventoConvidado {
+  id          String   @id @default(uuid())
+  evento_id   String
+  corretor_id String
+  evento      Evento   @relation(fields: [evento_id], references: [id], onDelete: Cascade)
+  corretor    Corretor @relation(fields: [corretor_id], references: [id], onDelete: Cascade)
+  created_at  DateTime @default(now())
+
+  @@unique([evento_id, corretor_id])
+  @@index([corretor_id])
+  @@map("evento_convidados")
+}
+
 // ─── Log de Auditoria (ações dos administradores) ────────────────
 
 model AuditLog {
@@ -251,7 +270,7 @@ model Configuracao {
   empresa_email    String   @default("")
   empresa_telefone String   @default("")
   empresa_site     String   @default("")
-  auto_approve     Boolean  @default(false)  // aprovar corretores automaticamente
+  auto_approve     Boolean  @default(true)   // aprovar corretores automaticamente no cadastro
   notify_inscricao Boolean  @default(true)   // notificar inscrição
   allow_cancel     Boolean  @default(true)   // permitir cancelamento pelo corretor
   updated_at       DateTime @updatedAt @default(now())

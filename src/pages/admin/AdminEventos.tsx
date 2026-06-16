@@ -167,7 +167,7 @@ export function AdminEventos() {
     }
   }
 
-  const handleSave = async (data: Partial<Evento>, bannerFile: File | null) => {
+  const handleSave = async (data: Partial<Evento> & { convidados?: string[] }, bannerFile: File | null) => {
     try {
       // 1. Cria ou atualiza o evento (obtém o id)
       const salvo = editingEvento

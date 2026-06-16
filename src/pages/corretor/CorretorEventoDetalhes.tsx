@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { QrCodeCard } from '@/components/shared/QrCodeCard'
 import { EventoMateriais } from '@/components/shared/EventoMateriais'
+import { ShareEventoButton } from '@/components/shared/ShareEventoButton'
 import { fetchEventoById } from '@/services/eventos'
 import { fetchMinhasInscricoes, createInscricao, cancelarInscricao, baixarCertificado } from '@/services/inscricoes'
 import { formatDate } from '@/lib/utils'
@@ -108,7 +109,10 @@ export function CorretorEventoDetalhes() {
 
   return (
     <div className="space-y-6">
-      <BackButton onClick={() => navigate('/portal/eventos')} label="Voltar aos eventos" />
+      <div className="flex items-center justify-between gap-3">
+        <BackButton onClick={() => navigate('/portal/eventos')} label="Voltar aos eventos" />
+        {!evento.exclusivo && id && <ShareEventoButton eventoId={id} titulo={evento.titulo} />}
+      </div>
 
       {/* Banner (visão reduzida — clique para ver a imagem completa) */}
       {evento.banner_url ? (

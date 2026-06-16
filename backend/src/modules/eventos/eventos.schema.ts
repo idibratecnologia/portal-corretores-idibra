@@ -32,6 +32,8 @@ export const createEventoSchema = z.object({
   capacidade:        z.coerce.number().int().positive('Capacidade deve ser positiva'),
   inscricoes_abertas: z.boolean().optional(),
   certificados_habilitados: z.boolean().optional(),
+  exclusivo:         z.boolean().optional(),
+  convidados:        z.array(z.string().uuid()).optional(),  // ids dos corretores convidados
 })
 
 export const updateEventoSchema = createEventoSchema.partial()

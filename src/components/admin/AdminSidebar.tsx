@@ -7,6 +7,7 @@ import {
   Building2,
   BarChart3,
   Bell,
+  Megaphone,
   Settings,
   ShieldCheck,
   ScrollText,
@@ -42,6 +43,7 @@ const navGroups = [
     items: [
       { to: '/admin/relatorios', icon: BarChart3, label: 'Relatórios' },
       { to: '/admin/notificacoes', icon: Bell, label: 'Notificações' },
+      { to: '/admin/disparos', icon: Megaphone, label: 'Disparos' },
       { to: '/admin/usuarios', icon: ShieldCheck, label: 'Usuários', superOnly: true },
       { to: '/admin/logs', icon: ScrollText, label: 'Logs', superOnly: true },
       { to: '/admin/configuracoes', icon: Settings, label: 'Configurações' },

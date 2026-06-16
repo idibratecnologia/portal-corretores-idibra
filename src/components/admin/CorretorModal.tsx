@@ -47,6 +47,7 @@ const schema = z.object({
   cidade: z.string().min(1, 'Cidade obrigatória'),
   uf: z.string().min(2, 'UF obrigatória'),
   instagram: z.string().optional(),
+  data_nascimento: z.string().optional(),
   observacoes_admin: z.string().optional(),
   whatsapp_opt_in: z.boolean().optional(),
 })
@@ -89,6 +90,7 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
         cidade: corretor.cidade,
         uf: corretor.uf,
         instagram: corretor.instagram || '',
+        data_nascimento: corretor.data_nascimento ? corretor.data_nascimento.slice(0, 10) : '',
         observacoes_admin: corretor.observacoes_admin || '',
         whatsapp_opt_in: corretor.whatsapp_opt_in ?? false,
       })
@@ -97,7 +99,8 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
     }
   }, [corretor, reset])
 
-  const onSubmit = (data: FormData) => onSave(data)
+  const onSubmit = (data: FormData) =>
+    onSave({ ...data, data_nascimento: data.data_nascimento || null })
 
   function maskedField(
     field: 'cpf' | 'telefone' | 'whatsapp',
@@ -189,9 +192,14 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
               {errors.uf && <p className="text-xs text-red-500 mt-1">{errors.uf.message}</p>}
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
               <Label>Instagram</Label>
               <Input {...register('instagram')} placeholder="@usuario" className="mt-1" />
+            </div>
+
+            <div>
+              <Label>Data de nascimento</Label>
+              <Input type="date" {...register('data_nascimento')} className="mt-1" />
             </div>
 
             <div className="sm:col-span-2">

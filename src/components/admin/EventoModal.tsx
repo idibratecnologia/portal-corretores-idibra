@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Upload, X } from 'lucide-react'
+import { Upload, X, Lock, Search, Users } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import type { Evento } from '@/types'
+import { fetchCorretores } from '@/services/corretores'
+import type { Evento, Corretor } from '@/types'
 
 const schema = z.object({
   titulo: z.string().min(1, 'Título obrigatório'),
@@ -49,7 +50,7 @@ function toDateInput(value: string | Date | undefined): string {
 interface EventoModalProps {
   open: boolean
   onClose: () => void
-  onSave: (data: Partial<Evento>, bannerFile: File | null) => void | Promise<void>
+  onSave: (data: Partial<Evento> & { convidados?: string[] }, bannerFile: File | null) => void | Promise<void>
   evento: Evento | null
 }
 
@@ -59,6 +60,12 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
   const [bannerPreview, setBannerPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const bannerInputRef = useRef<HTMLInputElement>(null)
+
+  // Evento exclusivo + convidados
+  const [exclusivo, setExclusivo] = useState(false)
+  const [convidados, setConvidados] = useState<string[]>([])
+  const [corretores, setCorretores] = useState<Corretor[]>([])
+  const [buscaCorr, setBuscaCorr] = useState('')
   const {
     register,
     handleSubmit,
@@ -87,12 +94,35 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
         inscricoes_abertas: evento.inscricoes_abertas,
       })
       setBannerPreview(evento.banner_url || null)
+      setExclusivo(evento.exclusivo ?? false)
+      setConvidados(evento.convidados_ids ?? [])
     } else {
       reset({ inscricoes_abertas: true, capacidade: 50 })
       setBannerPreview(null)
+      setExclusivo(false)
+      setConvidados([])
     }
     setBannerFile(null)
+    setBuscaCorr('')
   }, [evento, reset, open])
+
+  // Carrega corretores ativos para a seleção de convidados
+  useEffect(() => {
+    if (open) {
+      fetchCorretores({ status: 'ativo', limit: 1000 })
+        .then((r) => setCorretores(r.data))
+        .catch(() => setCorretores([]))
+    }
+  }, [open])
+
+  const toggleConvidado = (id: string) =>
+    setConvidados((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+
+  const corretoresFiltrados = corretores.filter((c) => {
+    const q = buscaCorr.trim().toLowerCase()
+    if (!q) return true
+    return c.nome.toLowerCase().includes(q) || (c.creci ?? '').toLowerCase().includes(q)
+  })
 
   const handleBannerSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -116,9 +146,16 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
   }
 
   const onSubmit = async (data: FormData) => {
+    if (exclusivo && convidados.length === 0) {
+      toast({ title: 'Selecione os convidados', description: 'Um evento exclusivo precisa de ao menos um corretor selecionado.', variant: 'destructive' })
+      return
+    }
     setSaving(true)
     try {
-      await onSave(data as Partial<Evento>, bannerFile)
+      await onSave(
+        { ...(data as Partial<Evento>), exclusivo, convidados: exclusivo ? convidados : [] },
+        bannerFile,
+      )
     } finally {
       setSaving(false)
     }
@@ -253,6 +290,40 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
             <div className="flex items-center gap-2">
               <input type="checkbox" id="inscricoes_abertas" {...register('inscricoes_abertas')} className="rounded" />
               <Label htmlFor="inscricoes_abertas">Inscrições abertas</Label>
+            </div>
+
+            {/* Evento exclusivo */}
+            <div className="sm:col-span-2 rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-3">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={exclusivo} onChange={(e) => setExclusivo(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-green-600 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 text-green-600" /> Evento exclusivo</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Só os corretores selecionados verão o evento e receberão a notificação.</p>
+                </div>
+              </label>
+
+              {exclusivo && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="relative flex-1 max-w-xs">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                      <Input value={buscaCorr} onChange={(e) => setBuscaCorr(e.target.value)} placeholder="Buscar corretor…" className="pl-8 h-9 text-sm" />
+                    </div>
+                    <span className="text-xs font-semibold text-green-700 flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {convidados.length} selecionado(s)</span>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-100 bg-white divide-y divide-gray-50">
+                    {corretoresFiltrados.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-4">Nenhum corretor encontrado.</p>
+                    ) : corretoresFiltrados.map((c) => (
+                      <label key={c.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-50">
+                        <input type="checkbox" checked={convidados.includes(c.id)} onChange={() => toggleConvidado(c.id)} className="w-4 h-4 rounded accent-green-600" />
+                        <span className="text-sm text-gray-800 flex-1 truncate">{c.nome}</span>
+                        <span className="text-[11px] text-gray-400">{c.creci}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma'
 
 export type AuditAcao = 'criou' | 'editou' | 'excluiu' | 'status' | 'enviou' | 'importou' | 'aprovou'
 export type AuditEntidade =
-  | 'corretor' | 'imobiliaria' | 'evento' | 'usuario' | 'inscricao' | 'certificado' | 'importacao'
+  | 'corretor' | 'imobiliaria' | 'evento' | 'usuario' | 'inscricao' | 'certificado' | 'importacao' | 'broadcast'
 
 /** Registra um evento de auditoria a partir da requisição (ator vem do JWT). */
 export function audit(

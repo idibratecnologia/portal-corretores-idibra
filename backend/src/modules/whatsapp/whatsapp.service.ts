@@ -7,6 +7,7 @@ import { sendText, sendMedia } from '@/lib/evolution'
 import { resolveMediaForSend } from '@/lib/storage'
 import { formatDataEvento } from '@/lib/format'
 import { renderMensagem } from '@/modules/templates/templates.service'
+import { notify } from '@/lib/notifications'
 import { NotFoundError, BadRequestError } from '@/lib/errors'
 
 /** Normaliza um número BR para o formato internacional 55DDDNUMERO. */
@@ -57,4 +58,31 @@ export async function enviarTesteTexto(numero: string, texto: string): Promise<v
     throw new BadRequestError('WhatsApp não está configurado no servidor.')
   }
   await sendText(formatNumero(numero), texto)
+}
+
+/**
+ * Disparo em massa: envia uma mensagem para os corretores selecionados,
+ * respeitando o opt-in (LGPD) e a fila com throttle. `{nome}` é substituído
+ * pelo primeiro nome do corretor.
+ */
+export async function broadcast(
+  mensagem: string,
+  corretorIds: string[],
+): Promise<{ total: number; enfileirados: number; semOptIn: number }> {
+  const corretores = await prisma.corretor.findMany({
+    where:  { id: { in: corretorIds } },
+    select: { id: true, nome: true, whatsapp: true, whatsapp_opt_in: true },
+  })
+
+  let enfileirados = 0
+  let semOptIn = 0
+  for (const c of corretores) {
+    if (!c.whatsapp_opt_in || !c.whatsapp) { semOptIn++; continue }
+    await notify({
+      corretorId: c.id, tipo: 'broadcast', whatsapp: c.whatsapp, optIn: true,
+      mensagem: mensagem.replace(/\{nome\}/g, c.nome.split(' ')[0]),
+    })
+    enfileirados++
+  }
+  return { total: corretores.length, enfileirados, semOptIn }
 }

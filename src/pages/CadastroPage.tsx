@@ -130,13 +130,13 @@ export function CadastroPage() {
           <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
             <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Cadastro enviado!</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Cadastro concluído!</h2>
           <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-            Seus dados foram recebidos. A equipe IDIBRA irá analisar suas informações
-            e você receberá um e-mail com o resultado em até 2 dias úteis.
+            Sua conta já está ativa. Faça login com seu e-mail e senha para acessar
+            os eventos e lançamentos da IDIBRA.
           </p>
-          <Button onClick={() => navigate('/login')} className="w-full bg-green-700 hover:bg-green-800 rounded-xl">
-            Voltar ao login
+          <Button onClick={() => navigate('/')} className="w-full bg-green-700 hover:bg-green-800 rounded-xl">
+            Entrar agora
           </Button>
         </div>
       </div>

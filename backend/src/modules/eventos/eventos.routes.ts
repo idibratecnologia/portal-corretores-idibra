@@ -22,13 +22,17 @@ export async function eventosRoutes(app: FastifyInstance) {
   // Corretor recebe só publicados; admin recebe todos com filtros.
   app.get('/', { preHandler: [authenticate] }, async (req, reply) => {
     const filters = listEventosSchema.parse(req.query)
-    const onlyPublished = req.user!.role !== 'admin'
-    return reply.send(await service.listEventos(filters, onlyPublished))
+    const isCorretor = req.user!.role !== 'admin'
+    return reply.send(await service.listEventos(filters, {
+      onlyPublished: isCorretor,
+      corretorId: isCorretor ? req.user!.sub : undefined,
+    }))
   })
 
   app.get('/:id', { preHandler: [authenticate] }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
-    return reply.send(await service.getEventoById(id))
+    const corretorId = req.user!.role === 'corretor' ? req.user!.sub : undefined
+    return reply.send(await service.getEventoById(id, corretorId))
   })
 
   // ── Mutações (admin) ──────────────────────────────────────────

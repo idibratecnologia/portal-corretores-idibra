@@ -24,20 +24,33 @@ async function withContagens<T extends { id: string }>(evento: T) {
 
 // ─── Listagem (admin: todos | corretor: só publicados) ───────────
 
-export async function listEventos(filters: ListEventosInput, onlyPublished = false) {
+export async function listEventos(
+  filters: ListEventosInput,
+  opts: { onlyPublished?: boolean; corretorId?: string } = {},
+) {
+  const { onlyPublished = false, corretorId } = opts
   const { page, limit, skip, take } = resolvePagination(filters)
+
+  // Condições combináveis (search + visibilidade de exclusivos) via AND
+  const and: Prisma.EventoWhereInput[] = []
+  if (filters.search) {
+    and.push({ OR: [
+      { titulo: { contains: filters.search, mode: 'insensitive' } },
+      { local:  { contains: filters.search, mode: 'insensitive' } },
+    ] })
+  }
+  // Corretor só vê: eventos não-exclusivos OU exclusivos em que foi convidado
+  if (corretorId) {
+    and.push({ OR: [
+      { exclusivo: false },
+      { convidados: { some: { corretor_id: corretorId } } },
+    ] })
+  }
 
   const where: Prisma.EventoWhereInput = {
     ...(onlyPublished ? { status: 'publicado' } : (filters.status ? { status: filters.status } : {})),
     ...(filters.tipo ? { tipo: filters.tipo } : {}),
-    ...(filters.search
-      ? {
-          OR: [
-            { titulo: { contains: filters.search, mode: 'insensitive' } },
-            { local:  { contains: filters.search, mode: 'insensitive' } },
-          ],
-        }
-      : {}),
+    ...(and.length ? { AND: and } : {}),
   }
 
   const orderBy: Prisma.EventoOrderByWithRelationInput = filters.sort
@@ -55,10 +68,42 @@ export async function listEventos(filters: ListEventosInput, onlyPublished = fal
 
 // ─── Detalhe ──────────────────────────────────────────────────────
 
-export async function getEventoById(id: string) {
-  const evento = await prisma.evento.findUnique({ where: { id } })
+export async function getEventoById(id: string, corretorId?: string) {
+  const evento = await prisma.evento.findUnique({
+    where:   { id },
+    include: { convidados: { select: { corretor_id: true } } },
+  })
   if (!evento) throw new NotFoundError('Evento não encontrado')
-  return withContagens(evento)
+
+  // Corretor só acessa evento exclusivo se foi convidado (esconde a existência)
+  if (corretorId && evento.exclusivo && !evento.convidados.some((c) => c.corretor_id === corretorId)) {
+    throw new NotFoundError('Evento não encontrado')
+  }
+
+  const { convidados, ...rest } = evento
+  const base = await withContagens(rest)
+  // Lista de convidados só é exposta ao admin (corretorId indefinido)
+  return corretorId ? base : { ...base, convidados_ids: convidados.map((c) => c.corretor_id) }
+}
+
+// ─── Página pública (compartilhamento, sem login) ────────────────
+
+/** Dados públicos de um evento publicado/encerrado e não-exclusivo. */
+export async function getEventoPublico(id: string) {
+  const ev = await prisma.evento.findUnique({
+    where: { id },
+    select: {
+      id: true, titulo: true, descricao: true, tipo: true, empreendimento: true,
+      banner_url: true, data_evento: true, hora_inicio: true, hora_fim: true,
+      local: true, endereco: true, link_maps: true, status: true, exclusivo: true,
+    },
+  })
+  // Eventos exclusivos ou não publicados não são divulgados publicamente
+  if (!ev || ev.exclusivo || (ev.status !== 'publicado' && ev.status !== 'encerrado')) {
+    throw new NotFoundError('Evento não encontrado')
+  }
+  const { exclusivo: _e, status: _s, ...publico } = ev
+  return publico
 }
 
 // ─── Criação ──────────────────────────────────────────────────────
@@ -78,9 +123,16 @@ export async function createEvento(input: CreateEventoInput) {
       hora_fim:          input.hora_fim,
       capacidade:        input.capacidade,
       inscricoes_abertas: input.inscricoes_abertas ?? true,
+      exclusivo:         input.exclusivo ?? false,
       status:            'rascunho',
     },
   })
+  if (input.exclusivo && input.convidados?.length) {
+    await prisma.eventoConvidado.createMany({
+      data: input.convidados.map((cid) => ({ evento_id: evento.id, corretor_id: cid })),
+      skipDuplicates: true,
+    })
+  }
   return withContagens(evento)
 }
 
@@ -88,10 +140,23 @@ export async function createEvento(input: CreateEventoInput) {
 
 export async function updateEvento(id: string, input: UpdateEventoInput) {
   await ensureExists(id)
+  const { convidados, ...rest } = input
   const evento = await prisma.evento.update({
     where: { id },
-    data: { ...input, link_maps: input.link_maps === '' ? null : input.link_maps },
+    data: { ...rest, link_maps: rest.link_maps === '' ? null : rest.link_maps },
   })
+
+  // Substitui a lista de convidados quando enviada
+  if (convidados !== undefined) {
+    await prisma.eventoConvidado.deleteMany({ where: { evento_id: id } })
+    if (convidados.length) {
+      await prisma.eventoConvidado.createMany({
+        data: convidados.map((cid) => ({ evento_id: id, corretor_id: cid })),
+        skipDuplicates: true,
+      })
+    }
+  }
+
   emitAdminRefresh('evento-atualizado')
   return withContagens(evento)
 }
@@ -168,10 +233,20 @@ async function broadcastEventoNovo(evento: Prisma.EventoGetPayload<object>): Pro
   })
   if (jaDivulgado) return
 
-  const corretores = await prisma.corretor.findMany({
-    where:  { status: 'ativo', whatsapp_opt_in: true },
-    select: { id: true, nome: true, whatsapp: true },
-  })
+  // Exclusivo: divulga só para os convidados (com opt-in). Senão, todos os ativos com opt-in.
+  let corretores: Array<{ id: string; nome: string; whatsapp: string }>
+  if (evento.exclusivo) {
+    const convs = await prisma.eventoConvidado.findMany({
+      where:   { evento_id: evento.id },
+      include: { corretor: { select: { id: true, nome: true, whatsapp: true, whatsapp_opt_in: true } } },
+    })
+    corretores = convs.map((c) => c.corretor).filter((c) => c.whatsapp_opt_in)
+  } else {
+    corretores = await prisma.corretor.findMany({
+      where:  { status: 'ativo', whatsapp_opt_in: true },
+      select: { id: true, nome: true, whatsapp: true },
+    })
+  }
   if (corretores.length === 0) return
 
   for (const c of corretores) {

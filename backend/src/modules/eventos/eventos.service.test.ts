@@ -66,7 +66,7 @@ describe('eventos.listEventos', () => {
     await criarEvento({ status: 'rascunho' })
     await criarEvento({ status: 'encerrado' })
 
-    const res = await eventos.listEventos({}, true)
+    const res = await eventos.listEventos({}, { onlyPublished: true })
     expect(res.data.every((e) => e.status === 'publicado')).toBe(true)
     expect(res.data.length).toBe(1)
   })

@@ -26,6 +26,8 @@ export const createCorretorSchema = z.object({
   whatsapp:       z.string().min(14, 'WhatsApp inválido'),
   whatsapp_opt_in: z.boolean().optional(),
   instagram:      z.string().optional(),
+  data_nascimento: z.coerce.date().optional().nullable()
+                     .transform((d) => d ? new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0)) : d),
   cidade:         z.string().min(1, 'Cidade obrigatória'),
   uf:             z.string().length(2, 'UF inválida'),
   imobiliaria_id: z.string().uuid().optional(),

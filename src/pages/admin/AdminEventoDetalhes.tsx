@@ -348,6 +348,25 @@ export function AdminEventoDetalhes() {
             Enviar certificados (WhatsApp)
           </Button>
         </div>
+
+        {/* Status do envio automático */}
+        {(evento.enviar_certificado_auto || evento.certificados_enviados_em) && (
+          <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/60">
+            {evento.certificados_enviados_em ? (
+              <p className="text-sm text-green-700 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                Certificados enviados automaticamente por WhatsApp em{' '}
+                <strong>{new Date(evento.certificados_enviados_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</strong>.
+              </p>
+            ) : (
+              <p className="text-sm text-gray-600 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                Envio automático <strong>ligado</strong>: os certificados serão enviados aos presentes ao encerrar o evento
+                ({new Date(evento.data_evento).toLocaleDateString('pt-BR')} às {evento.hora_fim}).
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Materiais do evento */}

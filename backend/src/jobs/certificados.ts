@@ -10,6 +10,7 @@
  */
 import cron from 'node-cron'
 import { prisma } from '@/lib/prisma'
+import { emitAdminRefresh } from '@/lib/events'
 import { enviarCertificadosEvento } from '@/modules/inscricoes/inscricoes.service'
 
 /** Instante de término do evento (dia de data_evento + hora_fim, horário local). */
@@ -60,6 +61,7 @@ export async function enviarCertificadosAutomaticos(ref: Date = new Date()): Pro
     }
   }
 
+  if (eventos) emitAdminRefresh('certificados-auto')
   return { eventos, enfileirados }
 }
 

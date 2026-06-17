@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Upload, X, Lock, Search, Users } from 'lucide-react'
+import { Upload, X, Lock, Search, Users, Award } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -61,6 +61,8 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
   const [saving, setSaving] = useState(false)
   const bannerInputRef = useRef<HTMLInputElement>(null)
 
+  // Certificado automático por WhatsApp ao encerrar
+  const [certAuto, setCertAuto] = useState(false)
   // Evento exclusivo + convidados
   const [exclusivo, setExclusivo] = useState(false)
   const [convidados, setConvidados] = useState<string[]>([])
@@ -95,11 +97,13 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
       })
       setBannerPreview(evento.banner_url || null)
       setExclusivo(evento.exclusivo ?? false)
+      setCertAuto(evento.enviar_certificado_auto ?? false)
       setConvidados(evento.convidados_ids ?? [])
     } else {
       reset({ inscricoes_abertas: true, capacidade: 50 })
       setBannerPreview(null)
       setExclusivo(false)
+      setCertAuto(false)
       setConvidados([])
     }
     setBannerFile(null)
@@ -153,7 +157,7 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
     setSaving(true)
     try {
       await onSave(
-        { ...(data as Partial<Evento>), exclusivo, convidados: exclusivo ? convidados : [] },
+        { ...(data as Partial<Evento>), exclusivo, enviar_certificado_auto: certAuto, convidados: exclusivo ? convidados : [] },
         bannerFile,
       )
     } finally {
@@ -290,6 +294,17 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
             <div className="flex items-center gap-2">
               <input type="checkbox" id="inscricoes_abertas" {...register('inscricoes_abertas')} className="rounded" />
               <Label htmlFor="inscricoes_abertas">Inscrições abertas</Label>
+            </div>
+
+            {/* Certificado automático por WhatsApp ao encerrar */}
+            <div className="sm:col-span-2 rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={certAuto} onChange={(e) => setCertAuto(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-green-600 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5"><Award className="w-3.5 h-3.5 text-green-600" /> Enviar certificado automaticamente</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Ao encerrar o evento (data + hora de término), o certificado é enviado pelo WhatsApp a todos os presentes (respeita o opt-in) e liberado para download no portal.</p>
+                </div>
+              </label>
             </div>
 
             {/* Evento exclusivo */}

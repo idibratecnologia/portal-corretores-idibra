@@ -142,6 +142,8 @@ model Evento {
   status             StatusEvento @default(rascunho)
   inscricoes_abertas Boolean      @default(true)
   certificados_habilitados Boolean @default(false)  // Admin libera a emissão de certificados
+  enviar_certificado_auto  Boolean @default(false)  // Enviar certificado por WhatsApp ao encerrar o evento
+  certificados_enviados_em DateTime?                 // Carimbo do envio automático (idempotência)
   exclusivo          Boolean      @default(false)   // Visível/notificado só para corretores convidados
 
   inscricoes         Inscricao[]

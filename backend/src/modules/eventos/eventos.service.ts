@@ -123,6 +123,8 @@ export async function createEvento(input: CreateEventoInput) {
       hora_fim:          input.hora_fim,
       capacidade:        input.capacidade,
       inscricoes_abertas: input.inscricoes_abertas ?? true,
+      certificados_habilitados: input.certificados_habilitados ?? false,
+      enviar_certificado_auto: input.enviar_certificado_auto ?? false,
       exclusivo:         input.exclusivo ?? false,
       status:            'rascunho',
     },

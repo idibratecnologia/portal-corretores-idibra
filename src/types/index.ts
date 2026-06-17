@@ -69,6 +69,8 @@ export interface Evento {
   status: StatusEvento
   inscricoes_abertas: boolean
   certificados_habilitados?: boolean
+  enviar_certificado_auto?: boolean
+  certificados_enviados_em?: string | null
   exclusivo?: boolean
   convidados_ids?: string[]
   criado_por?: string

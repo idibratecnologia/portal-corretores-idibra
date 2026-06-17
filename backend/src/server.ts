@@ -36,6 +36,7 @@ import { publicoRoutes } from '@/modules/publico/publico.routes'
 import { seedTemplates } from '@/modules/templates/templates.service'
 import { agendarLembretes } from '@/jobs/lembretes'
 import { agendarLimpezaVideos } from '@/jobs/videos'
+import { agendarCertificadosAutomaticos } from '@/jobs/certificados'
 import { recuperarFilaPendente } from '@/lib/video-queue'
 
 async function buildServer() {
@@ -188,6 +189,7 @@ async function start() {
       seedTemplates().catch((e) => app.log.error(e))
       agendarLembretes()
       agendarLimpezaVideos()
+      agendarCertificadosAutomaticos()
       recuperarFilaPendente().catch((e) => app.log.error(e)) // reprocessa vídeos pendentes após restart
     }
   } catch (err) {

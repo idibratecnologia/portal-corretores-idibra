@@ -113,6 +113,7 @@ model Corretor {
   inscricoes        Inscricao[]
   notificacoes      NotificacaoLog[]
   convites          EventoConvidado[]
+  progresso_aulas        AulaProgresso[]
 
   created_at        DateTime       @default(now())
   updated_at        DateTime       @updatedAt
@@ -147,6 +148,7 @@ model Evento {
   notificacoes       NotificacaoLog[]
   materiais          EventoMaterial[]
   convidados         EventoConvidado[]
+  treinamentos       TreinamentoEvento[]
 
   created_at         DateTime     @default(now())
   updated_at         DateTime     @updatedAt
@@ -240,6 +242,133 @@ model EventoConvidado {
   @@unique([evento_id, corretor_id])
   @@index([corretor_id])
   @@map("evento_convidados")
+}
+
+// ─── Treinamentos ────────────────────────────────────────────────
+
+enum StatusVideo {
+  pendente
+  upload_recebido
+  processando
+  disponivel
+  erro_processamento
+  expirado
+  excluido
+}
+
+enum StatusProgresso {
+  nao_iniciado
+  em_andamento
+  concluido
+}
+
+// Treinamento = trilha/curso (container). Os vídeos ficam nas AULAS.
+model Treinamento {
+  id          String   @id @default(uuid())
+  titulo      String
+  descricao   String   @default("")
+  ativo       Boolean  @default(true)
+  obrigatorio Boolean  @default(false)
+
+  // Se true: cada aula só libera após o corretor concluir a anterior.
+  // Se false: cada aula usa a sua própria data_liberacao.
+  liberacao_sequencial Boolean @default(false)
+
+  aulas      TreinamentoAula[]
+  documentos TreinamentoDocumento[]
+  eventos    TreinamentoEvento[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([ativo])
+  @@map("treinamentos")
+}
+
+// Aula = um vídeo do treinamento (armazenado em storage privado).
+model TreinamentoAula {
+  id             String      @id @default(uuid())
+  treinamento_id String
+  treinamento    Treinamento @relation(fields: [treinamento_id], references: [id], onDelete: Cascade)
+
+  titulo    String
+  descricao String  @default("")
+  ordem     Int     @default(0)
+
+  // Vídeo (servido por rota protegida; original mantido até processar)
+  video_path    String?       // treinamentos/{tid}/aulas/{aid}/video/720p.mp4
+  original_path String?       // original aguardando/while processando (p/ recuperação da fila)
+  video_duracao Int?          // segundos (ffprobe)
+  thumbnail_url String?       // URL pública
+  status_video  StatusVideo   @default(pendente)
+  video_erro    String?
+
+  // Liberação por data (quando NÃO sequencial) e encerramento
+  data_liberacao    DateTime?
+  data_encerramento DateTime?
+
+  // Exclusão automática do vídeo após o encerramento
+  excluir_video_automaticamente Boolean   @default(false)
+  dias_para_exclusao            Int?
+  data_exclusao_video           DateTime?
+  video_excluido                Boolean   @default(false)
+
+  progressos AulaProgresso[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([treinamento_id])
+  @@map("treinamento_aulas")
+}
+
+model TreinamentoDocumento {
+  id             String      @id @default(uuid())
+  treinamento_id String
+  treinamento    Treinamento @relation(fields: [treinamento_id], references: [id], onDelete: Cascade)
+  titulo         String
+  path           String      // caminho relativo no storage privado
+  created_at     DateTime    @default(now())
+
+  @@index([treinamento_id])
+  @@map("treinamento_documentos")
+}
+
+model TreinamentoEvento {
+  id             String      @id @default(uuid())
+  treinamento_id String
+  evento_id      String
+  treinamento    Treinamento @relation(fields: [treinamento_id], references: [id], onDelete: Cascade)
+  evento         Evento      @relation(fields: [evento_id], references: [id], onDelete: Cascade)
+  ordem          Int         @default(0)
+  obrigatorio    Boolean?    // override no contexto do evento (null = usa o do treinamento)
+  created_at     DateTime    @default(now())
+
+  @@unique([treinamento_id, evento_id])
+  @@index([evento_id])
+  @@map("treinamento_eventos")
+}
+
+// Progresso por AULA por corretor (1 registro único por aula+corretor).
+model AulaProgresso {
+  id          String          @id @default(uuid())
+  aula_id     String
+  corretor_id String
+  aula        TreinamentoAula @relation(fields: [aula_id], references: [id], onDelete: Cascade)
+  corretor    Corretor        @relation(fields: [corretor_id], references: [id], onDelete: Cascade)
+
+  segundos_assistidos Int             @default(0)  // posição p/ "continuar de onde parou"
+  percentual          Int             @default(0)  // 0–100
+  status              StatusProgresso @default(nao_iniciado)
+  concluido_em        DateTime?
+  ultimo_acesso       DateTime        @default(now())
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([aula_id, corretor_id])
+  @@index([corretor_id])
+  @@map("aula_progressos")
 }
 
 // ─── Log de Auditoria (ações dos administradores) ────────────────

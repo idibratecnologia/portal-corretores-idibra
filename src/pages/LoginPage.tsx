@@ -2,19 +2,13 @@ import { useState } from 'react'
 import idibraLogo from '@/assets/idibra_logo.png'
 import idibraLogoPreta from '@/assets/idibra_logo_preta.png'
 import { useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Lock, Mail, ArrowRight, CheckCircle, Users, Calendar, TrendingUp } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail, ArrowRight, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const benefits = [
   'Acesso exclusivo a lançamentos imobiliários da IDIBRA',
   'Inscrição em eventos, treinamentos e workshops',
   'Acompanhamento de participações e histórico em tempo real',
-]
-
-const platformStats = [
-  { icon: Users,    value: '150+', label: 'Corretores' },
-  { icon: Calendar, value: '30+',  label: 'Eventos'    },
-  { icon: TrendingUp, value: '94%', label: 'Presença'  },
 ]
 
 export function LoginPage() {
@@ -78,16 +72,6 @@ export function LoginPage() {
             ))}
           </div>
 
-          {/* Platform stats */}
-          <div className="grid grid-cols-3 gap-3 pt-2">
-            {platformStats.map((s) => (
-              <div key={s.label} className="bg-white/5 border border-white/10 rounded-xl p-3 text-center backdrop-blur-sm">
-                <s.icon className="w-4 h-4 text-green-400 mx-auto mb-1.5" />
-                <p className="text-lg font-bold text-white leading-none">{s.value}</p>
-                <p className="text-[10px] text-slate-400 mt-1 font-medium">{s.label}</p>
-              </div>
-            ))}
-          </div>
         </div>
 
         <p className="relative text-slate-600 text-xs">© 2026 IDIBRA — Todos os direitos reservados</p>

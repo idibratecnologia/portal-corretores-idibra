@@ -30,10 +30,13 @@ import { notificationsRoutes } from '@/modules/notifications/notifications.route
 import { importRoutes } from '@/modules/import/import.routes'
 import { usuariosRoutes } from '@/modules/usuarios/usuarios.routes'
 import { materiaisRoutes } from '@/modules/materiais/materiais.routes'
+import { treinamentosRoutes } from '@/modules/treinamentos/treinamentos.routes'
 import { logsRoutes } from '@/modules/auditoria/auditoria.routes'
 import { publicoRoutes } from '@/modules/publico/publico.routes'
 import { seedTemplates } from '@/modules/templates/templates.service'
 import { agendarLembretes } from '@/jobs/lembretes'
+import { agendarLimpezaVideos } from '@/jobs/videos'
+import { recuperarFilaPendente } from '@/lib/video-queue'
 
 async function buildServer() {
   const app = Fastify({
@@ -157,6 +160,7 @@ async function buildServer() {
   await app.register(importRoutes,       { prefix: '/import' })
   await app.register(usuariosRoutes,     { prefix: '/usuarios' })
   await app.register(materiaisRoutes)
+  await app.register(treinamentosRoutes)
   await app.register(logsRoutes,         { prefix: '/logs' })
   await app.register(publicoRoutes,      { prefix: '/public' })
 
@@ -183,6 +187,8 @@ async function start() {
     if (config.env !== 'test') {
       seedTemplates().catch((e) => app.log.error(e))
       agendarLembretes()
+      agendarLimpezaVideos()
+      recuperarFilaPendente().catch((e) => app.log.error(e)) // reprocessa vídeos pendentes após restart
     }
   } catch (err) {
     app.log.error(err)

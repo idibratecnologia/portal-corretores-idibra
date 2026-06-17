@@ -3,5 +3,6 @@ dist/
 .env
 *.local
 uploads/
+storage/
 logs/
 *.log

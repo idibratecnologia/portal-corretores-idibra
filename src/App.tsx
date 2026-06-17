@@ -57,6 +57,8 @@ const AdminDisparos = lazyNamed(() => import('@/pages/admin/AdminDisparos'), 'Ad
 const AdminCheckinKiosk = lazyNamed(() => import('@/pages/admin/AdminCheckinKiosk'), 'AdminCheckinKiosk')
 const AdminCredenciamento = lazyNamed(() => import('@/pages/admin/AdminCredenciamento'), 'AdminCredenciamento')
 const AdminAprovacoes = lazyNamed(() => import('@/pages/admin/AdminAprovacoes'), 'AdminAprovacoes')
+const AdminTreinamentos = lazyNamed(() => import('@/pages/admin/AdminTreinamentos'), 'AdminTreinamentos')
+const AdminTreinamentoDetalhes = lazyNamed(() => import('@/pages/admin/AdminTreinamentoDetalhes'), 'AdminTreinamentoDetalhes')
 
 // Corretor pages
 const CorretorHome = lazyNamed(() => import('@/pages/corretor/CorretorHome'), 'CorretorHome')
@@ -65,6 +67,8 @@ const CorretorEventoDetalhes = lazyNamed(() => import('@/pages/corretor/Corretor
 const CorretorInscricoes = lazyNamed(() => import('@/pages/corretor/CorretorInscricoes'), 'CorretorInscricoes')
 const CorretorHistorico = lazyNamed(() => import('@/pages/corretor/CorretorHistorico'), 'CorretorHistorico')
 const CorretorPerfil = lazyNamed(() => import('@/pages/corretor/CorretorPerfil'), 'CorretorPerfil')
+const CorretorTreinamentos = lazyNamed(() => import('@/pages/corretor/CorretorTreinamentos'), 'CorretorTreinamentos')
+const CorretorTreinamentoPlayer = lazyNamed(() => import('@/pages/corretor/CorretorTreinamentoPlayer'), 'CorretorTreinamentoPlayer')
 
 /** Restringe rotas a admins 'super' (dono). Operador é redirecionado. */
 function SuperRoute({ children }: { children: ReactNode }) {
@@ -116,6 +120,8 @@ function AppRoutes() {
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="eventos" element={<AdminEventos />} />
         <Route path="eventos/:id" element={<AdminEventoDetalhes />} />
+        <Route path="treinamentos" element={<AdminTreinamentos />} />
+        <Route path="treinamentos/:id" element={<AdminTreinamentoDetalhes />} />
         <Route path="corretores" element={<AdminCorretores />} />
         <Route path="corretores/:id" element={<AdminCorretorPerfil />} />
         <Route path="aprovacoes" element={<AdminAprovacoes />} />
@@ -134,6 +140,8 @@ function AppRoutes() {
         <Route path="home" element={<CorretorHome />} />
         <Route path="eventos" element={<CorretorEventos />} />
         <Route path="eventos/:id" element={<CorretorEventoDetalhes />} />
+        <Route path="treinamentos" element={<CorretorTreinamentos />} />
+        <Route path="treinamentos/:id" element={<CorretorTreinamentoPlayer />} />
         <Route path="inscricoes" element={<CorretorInscricoes />} />
         <Route path="historico" element={<CorretorHistorico />} />
         <Route path="perfil" element={<CorretorPerfil />} />

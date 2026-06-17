@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import idibraLogo from '@/assets/idibra_logo_preta.png'
-import { Home, Calendar, ClipboardList, History, User, Menu, X, LogOut, ChevronDown } from 'lucide-react'
+import { Home, Calendar, ClipboardList, History, User, Menu, X, LogOut, ChevronDown, GraduationCap } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -9,6 +9,7 @@ const navItems = [
   { to: '/portal/home',      icon: Home,          label: 'Início' },
   { to: '/portal/eventos',   icon: Calendar,      label: 'Eventos' },
   { to: '/portal/inscricoes',icon: ClipboardList, label: 'Inscrições' },
+  { to: '/portal/treinamentos', icon: GraduationCap, label: 'Treinamentos' },
   { to: '/portal/historico', icon: History,       label: 'Histórico' },
   { to: '/portal/perfil',    icon: User,          label: 'Perfil' },
 ]

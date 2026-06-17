@@ -19,6 +19,10 @@ const envSchema = z.object({
   UPLOAD_MAX_SIZE_MB: z.coerce.number().default(10),
   API_URL:            z.string().default('http://localhost:3000'),
 
+  // Storage PRIVADO (vídeos/documentos de treinamento — servidos por rota protegida)
+  STORAGE_DIR:        z.string().default('./storage'),
+  VIDEO_MAX_SIZE_MB:  z.coerce.number().default(2048),
+
   EVOLUTION_URL:      z.string().optional(),
   EVOLUTION_API_KEY:  z.string().optional(),
   EVOLUTION_INSTANCE: z.string().optional(),
@@ -60,6 +64,11 @@ export const config = {
     dir:        env.UPLOAD_DIR,
     maxSizeMB:  env.UPLOAD_MAX_SIZE_MB,
     apiUrl:     env.API_URL,
+  },
+
+  storage: {
+    dir:            env.STORAGE_DIR,       // raiz do storage privado
+    videoMaxSizeMB: env.VIDEO_MAX_SIZE_MB, // limite de upload do vídeo
   },
 
   evolution: {

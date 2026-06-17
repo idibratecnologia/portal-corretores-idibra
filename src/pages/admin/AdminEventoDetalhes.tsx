@@ -8,6 +8,7 @@ import { StatCard } from '@/components/shared/StatCard'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { QrScanner } from '@/components/shared/QrScanner'
 import { EventoMateriais } from '@/components/shared/EventoMateriais'
+import { EventoTreinamentosAdmin } from '@/components/admin/EventoTreinamentosAdmin'
 import { ShareEventoButton } from '@/components/shared/ShareEventoButton'
 import { fetchEventoById, updateEvento } from '@/services/eventos'
 import { fetchInscricoesByEvento, realizarCheckin, setInscricaoStatus, reenviarQrInscricao, exportarPresencaCsv, enviarCertificadosEvento } from '@/services/inscricoes'
@@ -351,6 +352,9 @@ export function AdminEventoDetalhes() {
 
       {/* Materiais do evento */}
       {id && <EventoMateriais eventoId={id} admin />}
+
+      {/* Treinamentos do evento */}
+      {id && <EventoTreinamentosAdmin eventoId={id} />}
 
       {/* Inscritos table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">

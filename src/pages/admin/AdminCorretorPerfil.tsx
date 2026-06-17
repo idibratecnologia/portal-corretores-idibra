@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { StatCard } from '@/components/shared/StatCard'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { CorretorModal } from '@/components/admin/CorretorModal'
+import { ImageViewer } from '@/components/shared/ImageViewer'
 import {
   AlertDialog, AlertDialogAction, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -38,6 +39,7 @@ export function AdminCorretorPerfil() {
   const [modalOpen, setModalOpen] = useState(false)
   const [resetandoSenha, setResetandoSenha] = useState(false)
   const [senhaTemp, setSenhaTemp] = useState<string | null>(null)
+  const [viewerOpen, setViewerOpen] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!id) return
@@ -174,7 +176,12 @@ export function AdminCorretorPerfil() {
           <div className="flex-shrink-0">
             <div className="w-24 h-24 rounded-full overflow-hidden bg-green-100 flex items-center justify-center text-green-700 text-4xl font-bold select-none">
               {corretor.foto_url ? (
-                <img src={corretor.foto_url} alt={corretor.nome} className="w-full h-full object-cover" />
+                <img
+                  src={corretor.foto_url}
+                  alt={corretor.nome}
+                  className="w-full h-full object-cover cursor-zoom-in"
+                  onClick={() => setViewerOpen(true)}
+                />
               ) : (
                 corretor.nome.charAt(0)
               )}
@@ -329,6 +336,8 @@ export function AdminCorretorPerfil() {
         onSave={handleSave}
         corretor={corretor}
       />
+
+      {corretor.foto_url && <ImageViewer src={corretor.foto_url} alt={corretor.nome} open={viewerOpen} onClose={() => setViewerOpen(false)} />}
 
       {/* Senha temporária gerada */}
       <AlertDialog open={!!senhaTemp} onOpenChange={(o) => { if (!o) setSenhaTemp(null) }}>

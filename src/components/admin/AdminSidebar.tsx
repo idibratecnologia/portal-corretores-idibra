@@ -16,6 +16,7 @@ import {
   X,
   ChevronRight,
   UserCheck,
+  GraduationCap,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -28,6 +29,7 @@ const navGroups = [
     items: [
       { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
       { to: '/admin/eventos', icon: Calendar, label: 'Eventos' },
+      { to: '/admin/treinamentos', icon: GraduationCap, label: 'Treinamentos' },
     ],
   },
   {

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { QrCodeCard } from '@/components/shared/QrCodeCard'
 import { EventoMateriais } from '@/components/shared/EventoMateriais'
+import { EventoTreinamentosCorretor } from '@/components/corretor/EventoTreinamentosCorretor'
 import { ShareEventoButton } from '@/components/shared/ShareEventoButton'
 import { fetchEventoById } from '@/services/eventos'
 import { fetchMinhasInscricoes, createInscricao, cancelarInscricao, baixarCertificado } from '@/services/inscricoes'
@@ -275,6 +276,9 @@ export function CorretorEventoDetalhes() {
 
       {/* Materiais do evento (apenas para inscritos) */}
       {isInscrito && id && <EventoMateriais eventoId={id} />}
+
+      {/* Treinamentos do evento (apenas para inscritos) */}
+      {isInscrito && id && <EventoTreinamentosCorretor eventoId={id} />}
 
       {/* QR Code Modal */}
       {qrModal && inscricao && (

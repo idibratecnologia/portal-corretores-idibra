@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { TrocarSenhaModal } from '@/components/shared/TrocarSenhaModal'
 import { ImageCropModal } from '@/components/shared/ImageCropModal'
+import { ImageViewer } from '@/components/shared/ImageViewer'
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchImobiliarias } from '@/services/imobiliarias'
 import type { Imobiliaria } from '@/types'
@@ -52,6 +53,7 @@ export function CorretorPerfil() {
   const [editing, setEditing] = useState(false)
   const [photoUrl, setPhotoUrl]           = useState<string | null>(corretor?.foto_url ?? null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [viewerOpen, setViewerOpen] = useState(false)
   const [imobiliarias, setImobiliarias] = useState<Imobiliaria[]>([])
   const [senhaModalOpen, setSenhaModalOpen] = useState(false)
   const [optIn, setOptIn] = useState<boolean>(corretor?.whatsapp_opt_in ?? false)
@@ -222,7 +224,8 @@ export function CorretorPerfil() {
                 <img
                   src={photoUrl}
                   alt="Foto de perfil"
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain cursor-zoom-in"
+                  onClick={() => setViewerOpen(true)}
                   onError={() => setPhotoUrl(null)}
                 />
               ) : (
@@ -451,6 +454,8 @@ export function CorretorPerfil() {
         onCancel={() => setCropSrc(null)}
         onConfirm={handleCropConfirm}
       />
+
+      {photoUrl && <ImageViewer src={photoUrl} alt={corretor?.nome} open={viewerOpen} onClose={() => setViewerOpen(false)} />}
     </div>
   )
 }

@@ -68,6 +68,7 @@ export interface Evento {
   banner_url?: string
   status: StatusEvento
   inscricoes_abertas: boolean
+  carga_horaria?: number | null
   certificados_habilitados?: boolean
   enviar_certificado_auto?: boolean
   certificados_enviados_em?: string | null

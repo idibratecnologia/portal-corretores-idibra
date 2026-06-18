@@ -10,7 +10,7 @@ import { EventoTreinamentosCorretor } from '@/components/corretor/EventoTreiname
 import { ShareEventoButton } from '@/components/shared/ShareEventoButton'
 import { fetchEventoById } from '@/services/eventos'
 import { fetchMinhasInscricoes, createInscricao, cancelarInscricao, baixarCertificado } from '@/services/inscricoes'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatCargaHoraria } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/errors'
 import type { Evento, EventoInscricao } from '@/types'
@@ -176,6 +176,16 @@ export function CorretorEventoDetalhes() {
                   <p className="text-gray-500">{evento.hora_inicio} – {evento.hora_fim}</p>
                 </div>
               </div>
+
+              {evento.carga_horaria ? (
+                <div className="flex items-start gap-3">
+                  <Clock className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-gray-900">Carga horária</p>
+                    <p className="text-gray-500">{formatCargaHoraria(evento.carga_horaria)}</p>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="flex items-start gap-3">
                 <MapPin className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />

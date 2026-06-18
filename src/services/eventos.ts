@@ -15,6 +15,7 @@ export interface EventoPublico {
   data_evento: string
   hora_inicio: string
   hora_fim: string
+  carga_horaria?: number | null
   local: string
   endereco: string
   link_maps?: string | null

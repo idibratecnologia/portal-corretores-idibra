@@ -9,10 +9,11 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { QrScanner } from '@/components/shared/QrScanner'
 import { EventoMateriais } from '@/components/shared/EventoMateriais'
 import { EventoTreinamentosAdmin } from '@/components/admin/EventoTreinamentosAdmin'
+import { EventoModelosAdmin } from '@/components/admin/EventoModelosAdmin'
 import { ShareEventoButton } from '@/components/shared/ShareEventoButton'
 import { fetchEventoById, updateEvento } from '@/services/eventos'
 import { fetchInscricoesByEvento, realizarCheckin, setInscricaoStatus, reenviarQrInscricao, exportarPresencaCsv, enviarCertificadosEvento } from '@/services/inscricoes'
-import { formatDate, formatDateTime } from '@/lib/utils'
+import { formatDate, formatDateTime, formatCargaHoraria } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh'
 import { getErrorMessage } from '@/lib/errors'
@@ -232,7 +233,7 @@ export function AdminEventoDetalhes() {
             </div>
             <div className="flex items-center gap-2 text-gray-600">
               <Clock className="w-4 h-4 text-green-600" />
-              <span>{evento.hora_inicio} – {evento.hora_fim}</span>
+              <span>{evento.hora_inicio} – {evento.hora_fim}{evento.carga_horaria ? ` · ${formatCargaHoraria(evento.carga_horaria)}` : ''}</span>
             </div>
             <div className="flex items-center gap-2 text-gray-600">
               <MapPin className="w-4 h-4 text-green-600" />
@@ -374,6 +375,9 @@ export function AdminEventoDetalhes() {
 
       {/* Treinamentos do evento */}
       {id && <EventoTreinamentosAdmin eventoId={id} />}
+
+      {/* Artes / Modelos do evento */}
+      {id && <EventoModelosAdmin eventoId={id} />}
 
       {/* Inscritos table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">

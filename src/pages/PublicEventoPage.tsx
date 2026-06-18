@@ -4,7 +4,7 @@ import { Calendar, Clock, MapPin, ExternalLink, Loader2, ArrowRight } from 'luci
 import idibraLogoPreta from '@/assets/idibra_logo_preta.png'
 import { Button } from '@/components/ui/button'
 import { fetchEventoPublico, type EventoPublico } from '@/services/eventos'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatCargaHoraria } from '@/lib/utils'
 
 export function PublicEventoPage() {
   const { id } = useParams()
@@ -73,7 +73,7 @@ export function PublicEventoPage() {
             <Calendar className="w-5 h-5 text-green-600 mt-0.5" />
             <div>
               <p className="font-semibold text-gray-900">{formatDate(evento.data_evento)}</p>
-              <p className="text-sm text-gray-500 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {evento.hora_inicio} – {evento.hora_fim}</p>
+              <p className="text-sm text-gray-500 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {evento.hora_inicio} – {evento.hora_fim}{evento.carga_horaria ? ` · ${formatCargaHoraria(evento.carga_horaria)}` : ''}</p>
             </div>
           </div>
           <div className="flex items-start gap-3 bg-white rounded-xl border border-gray-100 p-4">

@@ -29,6 +29,7 @@ const schema = z.object({
   data_evento: z.string().min(1, 'Data obrigatória'),
   hora_inicio: z.string().min(1, 'Hora de início obrigatória'),
   hora_fim: z.string().min(1, 'Hora de fim obrigatória'),
+  carga_horaria: z.string().optional(),
   capacidade: z.coerce.number().min(1, 'Capacidade obrigatória'),
   banner_url: z.string().optional(),
   inscricoes_abertas: z.boolean(),
@@ -91,6 +92,7 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
         data_evento: toDateInput(evento.data_evento),
         hora_inicio: evento.hora_inicio,
         hora_fim: evento.hora_fim,
+        carga_horaria: evento.carga_horaria != null ? String(evento.carga_horaria) : '',
         capacidade: evento.capacidade,
         banner_url: evento.banner_url || '',
         inscricoes_abertas: evento.inscricoes_abertas,
@@ -157,7 +159,13 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
     setSaving(true)
     try {
       await onSave(
-        { ...(data as Partial<Evento>), exclusivo, enviar_certificado_auto: certAuto, convidados: exclusivo ? convidados : [] },
+        {
+          ...(data as Partial<Evento>),
+          carga_horaria: data.carga_horaria ? Number(String(data.carga_horaria).replace(',', '.')) : null,
+          exclusivo,
+          enviar_certificado_auto: certAuto,
+          convidados: exclusivo ? convidados : [],
+        },
         bannerFile,
       )
     } finally {
@@ -251,6 +259,12 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
               <Label>Hora Fim *</Label>
               <Input type="time" {...register('hora_fim')} className="mt-1" />
               {errors.hora_fim && <p className="text-xs text-red-500 mt-1">{errors.hora_fim.message}</p>}
+            </div>
+
+            <div>
+              <Label>Carga horária (horas)</Label>
+              <Input type="number" step="0.5" min="0" {...register('carga_horaria')} placeholder="ex.: 4" className="mt-1" />
+              <p className="text-[11px] text-gray-400 mt-1">Opcional. Visível para o corretor. Aceita meia hora (ex.: 1.5).</p>
             </div>
 
             <div className="sm:col-span-2">

@@ -31,6 +31,7 @@ import { importRoutes } from '@/modules/import/import.routes'
 import { usuariosRoutes } from '@/modules/usuarios/usuarios.routes'
 import { materiaisRoutes } from '@/modules/materiais/materiais.routes'
 import { treinamentosRoutes } from '@/modules/treinamentos/treinamentos.routes'
+import { modelosRoutes } from '@/modules/modelos/modelos.routes'
 import { logsRoutes } from '@/modules/auditoria/auditoria.routes'
 import { publicoRoutes } from '@/modules/publico/publico.routes'
 import { seedTemplates } from '@/modules/templates/templates.service'
@@ -162,6 +163,7 @@ async function buildServer() {
   await app.register(usuariosRoutes,     { prefix: '/usuarios' })
   await app.register(materiaisRoutes)
   await app.register(treinamentosRoutes)
+  await app.register(modelosRoutes)
   await app.register(logsRoutes,         { prefix: '/logs' })
   await app.register(publicoRoutes,      { prefix: '/public' })
 

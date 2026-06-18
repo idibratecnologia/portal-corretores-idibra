@@ -25,6 +25,15 @@ export function formatDateTime(date: string | Date): string {
   })
 }
 
+/** Formata a carga horária (em horas) como "4h", "1h30" ou "30min". */
+export function formatCargaHoraria(horas: number | null | undefined): string {
+  if (!horas || horas <= 0) return ''
+  const h = Math.floor(horas)
+  const min = Math.round((horas - h) * 60)
+  if (h === 0) return `${min}min`
+  return min > 0 ? `${h}h${String(min).padStart(2, '0')}` : `${h}h`
+}
+
 export function formatCPF(cpf: string): string {
   return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
 }

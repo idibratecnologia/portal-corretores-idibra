@@ -137,6 +137,7 @@ model Evento {
   data_evento        DateTime     // Data e hora de início
   hora_inicio        String       @db.VarChar(5)  // "09:00"
   hora_fim           String       @db.VarChar(5)  // "18:00"
+  carga_horaria      Float?       // Carga horária do evento, em horas (ex.: 4, 1.5)
   capacidade         Int          // Número máximo de participantes
   banner_url         String?      // Caminho relativo: /uploads/banners/{uuid}.webp
   status             StatusEvento @default(rascunho)
@@ -151,6 +152,7 @@ model Evento {
   materiais          EventoMaterial[]
   convidados         EventoConvidado[]
   treinamentos       TreinamentoEvento[]
+  modelos            EventoModelo[]
 
   created_at         DateTime     @default(now())
   updated_at         DateTime     @updatedAt
@@ -371,6 +373,65 @@ model AulaProgresso {
   @@unique([aula_id, corretor_id])
   @@index([corretor_id])
   @@map("aula_progressos")
+}
+
+// ─── Modelos Visuais (editor estilo Canva) ──────────────────────
+
+enum TipoModelo {
+  credenciamento
+  cracha
+  certificado
+}
+
+model ModeloVisual {
+  id          String     @id @default(uuid())
+  nome        String
+  descricao   String     @default("")
+  tipo        TipoModelo
+  largura     Int        // px do canvas
+  altura      Int        // px do canvas
+  canvas_json Json?      // serialização do Fabric.js
+  ativo       Boolean    @default(true)
+
+  eventos     EventoModelo[]
+
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+
+  @@index([tipo])
+  @@map("modelos_visuais")
+}
+
+// Vínculo de um modelo a um evento (no máximo um por tipo por evento).
+model EventoModelo {
+  id        String       @id @default(uuid())
+  evento_id String
+  modelo_id String
+  tipo      TipoModelo
+  evento    Evento       @relation(fields: [evento_id], references: [id], onDelete: Cascade)
+  modelo    ModeloVisual @relation(fields: [modelo_id], references: [id], onDelete: Cascade)
+  created_at DateTime    @default(now())
+
+  @@unique([evento_id, tipo])
+  @@index([modelo_id])
+  @@map("evento_modelos")
+}
+
+// Registro de documentos visuais gerados (credenciamento/crachá/certificado).
+model DocumentoVisualGerado {
+  id           String     @id @default(uuid())
+  evento_id    String
+  modelo_id    String?
+  inscricao_id String?
+  corretor_id  String?
+  tipo         TipoModelo
+  formato      String     // png | pdf | zip
+  gerado_por   String?    // id do admin/operador
+  created_at   DateTime   @default(now())
+
+  @@index([evento_id])
+  @@index([corretor_id])
+  @@map("documentos_visuais_gerados")
 }
 
 // ─── Log de Auditoria (ações dos administradores) ────────────────

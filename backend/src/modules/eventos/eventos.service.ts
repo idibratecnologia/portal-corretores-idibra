@@ -94,7 +94,7 @@ export async function getEventoPublico(id: string) {
     where: { id },
     select: {
       id: true, titulo: true, descricao: true, tipo: true, empreendimento: true,
-      banner_url: true, data_evento: true, hora_inicio: true, hora_fim: true,
+      banner_url: true, data_evento: true, hora_inicio: true, hora_fim: true, carga_horaria: true,
       local: true, endereco: true, link_maps: true, status: true, exclusivo: true,
     },
   })
@@ -121,6 +121,7 @@ export async function createEvento(input: CreateEventoInput) {
       data_evento:       input.data_evento,
       hora_inicio:       input.hora_inicio,
       hora_fim:          input.hora_fim,
+      carga_horaria:     input.carga_horaria ?? null,
       capacidade:        input.capacidade,
       inscricoes_abertas: input.inscricoes_abertas ?? true,
       certificados_habilitados: input.certificados_habilitados ?? false,

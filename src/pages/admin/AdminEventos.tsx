@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, Search, Eye, Edit2, CheckCircle, XCircle,
-  PlayCircle, StopCircle, Calendar, Ban, ChevronUp, ChevronDown, BadgeCheck, Trash2,
+  PlayCircle, StopCircle, Calendar, Ban, ChevronUp, ChevronDown, BadgeCheck, Trash2, Award,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -316,6 +316,17 @@ export function AdminEventos() {
                               <div className="min-w-0">
                                 <p className="font-medium text-gray-900 line-clamp-1">{evento.titulo}</p>
                                 <p className="text-xs text-gray-400 mt-0.5 md:hidden">{TIPO_EVENTO_LABELS[evento.tipo] ?? evento.tipo} · {formatDate(evento.data_evento)}</p>
+                                {evento.certificados_enviados_em ? (
+                                  <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700"
+                                    title={`Certificados enviados automaticamente em ${new Date(evento.certificados_enviados_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`}>
+                                    <CheckCircle className="w-3 h-3" /> Certificado enviado
+                                  </span>
+                                ) : evento.enviar_certificado_auto ? (
+                                  <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700"
+                                    title="Certificado será enviado automaticamente por WhatsApp ao encerrar o evento">
+                                    <Award className="w-3 h-3" /> Certificado automático
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
                           </td>

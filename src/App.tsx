@@ -40,6 +40,7 @@ const CadastroPage = lazyNamed(() => import('@/pages/CadastroPage'), 'CadastroPa
 const EsqueciSenhaPage = lazyNamed(() => import('@/pages/EsqueciSenhaPage'), 'EsqueciSenhaPage')
 const ResetarSenhaPage = lazyNamed(() => import('@/pages/ResetarSenhaPage'), 'ResetarSenhaPage')
 const PublicEventoPage = lazyNamed(() => import('@/pages/PublicEventoPage'), 'PublicEventoPage')
+const ValidarCertificadoPage = lazyNamed(() => import('@/pages/ValidarCertificadoPage'), 'ValidarCertificadoPage')
 
 // Admin pages
 const AdminDashboard = lazyNamed(() => import('@/pages/admin/AdminDashboard'), 'AdminDashboard')
@@ -59,6 +60,8 @@ const AdminCredenciamento = lazyNamed(() => import('@/pages/admin/AdminCredencia
 const AdminAprovacoes = lazyNamed(() => import('@/pages/admin/AdminAprovacoes'), 'AdminAprovacoes')
 const AdminTreinamentos = lazyNamed(() => import('@/pages/admin/AdminTreinamentos'), 'AdminTreinamentos')
 const AdminTreinamentoDetalhes = lazyNamed(() => import('@/pages/admin/AdminTreinamentoDetalhes'), 'AdminTreinamentoDetalhes')
+const AdminModelos = lazyNamed(() => import('@/pages/admin/AdminModelos'), 'AdminModelos')
+const AdminModeloEditor = lazyNamed(() => import('@/pages/admin/AdminModeloEditor'), 'AdminModeloEditor')
 
 // Corretor pages
 const CorretorHome = lazyNamed(() => import('@/pages/corretor/CorretorHome'), 'CorretorHome')
@@ -108,6 +111,7 @@ function AppRoutes() {
       <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
       <Route path="/resetar-senha" element={<ResetarSenhaPage />} />
       <Route path="/evento/:id" element={<PublicEventoPage />} />
+      <Route path="/validar/:codigo" element={<ValidarCertificadoPage />} />
 
       {/* Redireciona variações de login para a raiz (consolida o canônico) */}
       <Route path="/login" element={<Navigate to="/" replace />} />
@@ -122,6 +126,8 @@ function AppRoutes() {
         <Route path="eventos/:id" element={<AdminEventoDetalhes />} />
         <Route path="treinamentos" element={<AdminTreinamentos />} />
         <Route path="treinamentos/:id" element={<AdminTreinamentoDetalhes />} />
+        <Route path="modelos" element={<AdminModelos />} />
+        <Route path="modelos/:id" element={<AdminModeloEditor />} />
         <Route path="corretores" element={<AdminCorretores />} />
         <Route path="corretores/:id" element={<AdminCorretorPerfil />} />
         <Route path="aprovacoes" element={<AdminAprovacoes />} />

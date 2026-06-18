@@ -29,6 +29,10 @@ export const createEventoSchema = z.object({
                      ),
   hora_inicio:       z.string().regex(/^\d{2}:\d{2}$/, 'Formato HH:MM'),
   hora_fim:          z.string().regex(/^\d{2}:\d{2}$/, 'Formato HH:MM'),
+  carga_horaria:     z.preprocess(
+                       (v) => (v === '' || v === null || v === undefined ? undefined : v),
+                       z.coerce.number().positive('Carga horária inválida').max(1000).optional(),
+                     ),
   capacidade:        z.coerce.number().int().positive('Capacidade deve ser positiva'),
   inscricoes_abertas: z.boolean().optional(),
   certificados_habilitados: z.boolean().optional(),

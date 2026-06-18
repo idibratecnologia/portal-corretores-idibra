@@ -63,9 +63,10 @@ describe('corretores.listCorretores', () => {
 })
 
 describe('corretores.resetSenhaAdmin', () => {
-  it('gera senha temporária', async () => {
+  it('envia o link de redefinição pelo WhatsApp', async () => {
     const c = await criarCorretor()
-    const { senha_temporaria } = await corretores.resetSenhaAdmin(c.id)
-    expect(senha_temporaria.length).toBeGreaterThanOrEqual(6)
+    const res = await corretores.resetSenhaAdmin(c.id)
+    expect(res.enviado).toBe(true)
+    expect(res.whatsapp).toBeTruthy()
   })
 })

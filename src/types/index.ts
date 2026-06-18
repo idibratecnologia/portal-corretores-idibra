@@ -35,9 +35,10 @@ export interface Corretor {
   cpf: string
   creci: string
   email: string
-  telefone: string
+  telefone?: string
   whatsapp: string
   whatsapp_opt_in?: boolean
+  senha_provisoria?: boolean
   foto_url?: string
   imobiliaria_id?: string
   imobiliaria?: Imobiliaria

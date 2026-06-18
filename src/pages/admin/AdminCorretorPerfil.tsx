@@ -38,7 +38,6 @@ export function AdminCorretorPerfil() {
   const [notFound, setNotFound] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [resetandoSenha, setResetandoSenha] = useState(false)
-  const [senhaTemp, setSenhaTemp] = useState<string | null>(null)
   const [viewerOpen, setViewerOpen] = useState(false)
 
   const loadData = useCallback(async () => {
@@ -103,8 +102,8 @@ export function AdminCorretorPerfil() {
     if (!corretor || resetandoSenha) return
     setResetandoSenha(true)
     try {
-      const { senha_temporaria } = await resetarSenhaCorretor(corretor.id)
-      setSenhaTemp(senha_temporaria)
+      const { whatsapp } = await resetarSenhaCorretor(corretor.id)
+      toast({ title: 'Link enviado no WhatsApp', description: `O corretor recebeu o link de redefinição em ${whatsapp}.` })
     } catch (err) {
       toast({ title: 'Erro', description: getErrorMessage(err), variant: 'destructive' })
     } finally {
@@ -201,13 +200,6 @@ export function AdminCorretorPerfil() {
               >
                 <Mail className="w-4 h-4 text-green-600 flex-shrink-0" />
                 <span className="group-hover:underline truncate">{corretor.email}</span>
-              </a>
-              <a
-                href={`tel:+55${phoneDigits(corretor.telefone)}`}
-                className="flex items-center gap-2 text-gray-600 hover:text-green-700 group transition-colors"
-              >
-                <Phone className="w-4 h-4 text-green-600 flex-shrink-0" />
-                <span className="group-hover:underline">{corretor.telefone}</span>
               </a>
               <div className="flex items-center gap-2 flex-wrap">
                 <a
@@ -338,36 +330,6 @@ export function AdminCorretorPerfil() {
       />
 
       {corretor.foto_url && <ImageViewer src={corretor.foto_url} alt={corretor.nome} open={viewerOpen} onClose={() => setViewerOpen(false)} />}
-
-      {/* Senha temporária gerada */}
-      <AlertDialog open={!!senhaTemp} onOpenChange={(o) => { if (!o) setSenhaTemp(null) }}>
-        <AlertDialogContent className="rounded-2xl max-w-sm">
-          <AlertDialogHeader>
-            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center mb-1">
-              <Lock className="w-6 h-6 text-green-700" />
-            </div>
-            <AlertDialogTitle className="text-base">Senha temporária gerada</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">
-              Repasse esta senha para <strong>{corretor.nome}</strong>. Ele deve trocá-la no primeiro acesso.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-            <code className="flex-1 text-lg font-bold text-gray-900 tracking-wider">{senhaTemp}</code>
-            <button
-              onClick={() => { if (senhaTemp) navigator.clipboard?.writeText(senhaTemp); toast({ title: 'Copiado!' }) }}
-              className="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors"
-              title="Copiar"
-            >
-              <Copy className="w-4 h-4" />
-            </button>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setSenhaTemp(null)} className="rounded-xl bg-green-700 hover:bg-green-800">
-              Entendi
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

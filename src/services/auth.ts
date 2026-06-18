@@ -30,11 +30,11 @@ export async function resetarSenha(token: string, nova_senha: string): Promise<v
   await api.post('/auth/resetar-senha', { token, nova_senha })
 }
 
-/** Admin reseta a senha de um corretor — retorna a senha temporária. */
-export async function resetarSenhaCorretor(id: string): Promise<{ senha_temporaria: string }> {
+/** Admin solicita o reset: envia o link de redefinição pelo WhatsApp do corretor. */
+export async function resetarSenhaCorretor(id: string): Promise<{ enviado: boolean; whatsapp: string }> {
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 500))
-    return { senha_temporaria: 'temp1234' }
+    return { enviado: true, whatsapp: '(00) 00000-0000' }
   }
-  return api.post<{ senha_temporaria: string }>(`/corretores/${id}/resetar-senha`, {})
+  return api.post<{ enviado: boolean; whatsapp: string }>(`/corretores/${id}/resetar-senha`, {})
 }

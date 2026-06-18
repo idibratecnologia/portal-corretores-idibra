@@ -183,13 +183,15 @@ export async function importCorretores(buffer: Buffer, opts: ImportOptions): Pro
     } else {
       report.novos++
       if (!opts.dryRun) {
-        // Senha temporária: o corretor define a própria via "Esqueci a senha"
-        const senhaTemp = Math.random().toString(36).slice(-10)
+        // 1º acesso: senha = CPF (somente números). O corretor é obrigado a
+        // trocar a senha no primeiro login (senha_provisoria = true).
+        const senhaInicial = data.cpf.replace(/\D/g, '')
         await prisma.corretor.create({
           data: {
             nome: data.nome, cpf: data.cpf, creci: data.creci, email: data.email,
-            senha: await hashPassword(senhaTemp),
-            telefone: data.telefone, whatsapp: data.whatsapp,
+            senha: await hashPassword(senhaInicial),
+            senha_provisoria: true,
+            telefone: data.telefone || data.whatsapp, whatsapp: data.whatsapp,
             whatsapp_opt_in: data.aceita_whatsapp, instagram: data.instagram || null,
             cidade: data.cidade, uf: data.uf,
             imobiliaria_id: imobiliariaId,

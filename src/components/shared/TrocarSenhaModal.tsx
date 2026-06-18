@@ -10,7 +10,7 @@ import { trocarSenha } from '@/services/auth'
 import { useToast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/errors'
 
-export function TrocarSenhaModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function TrocarSenhaModal({ open, onClose, obrigatorio = false }: { open: boolean; onClose: () => void; obrigatorio?: boolean }) {
   const { toast } = useToast()
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -39,14 +39,20 @@ export function TrocarSenhaModal({ open, onClose }: { open: boolean; onClose: ()
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose() } }}>
-      <DialogContent className="rounded-2xl max-w-sm">
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { if (obrigatorio) return; reset(); onClose() } }}>
+      <DialogContent className="rounded-2xl max-w-sm" hideClose={obrigatorio} onEscapeKeyDown={(e) => obrigatorio && e.preventDefault()} onInteractOutside={(e) => obrigatorio && e.preventDefault()}>
         <DialogHeader>
           <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center mb-1">
             <Lock className="w-6 h-6 text-green-700" />
           </div>
-          <DialogTitle>Trocar senha</DialogTitle>
+          <DialogTitle>{obrigatorio ? 'Defina sua nova senha' : 'Trocar senha'}</DialogTitle>
         </DialogHeader>
+
+        {obrigatorio && (
+          <p className="text-sm text-gray-500 -mt-2">
+            Este é seu primeiro acesso. Sua senha atual é o seu <strong>CPF</strong> (somente números). Crie uma nova senha para continuar.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
@@ -78,9 +84,11 @@ export function TrocarSenhaModal({ open, onClose }: { open: boolean; onClose: ()
           )}
 
           <DialogFooter className="gap-2 pt-1">
-            <Button type="button" variant="outline" onClick={() => { reset(); onClose() }} className="flex-1 rounded-xl" disabled={loading}>
-              Cancelar
-            </Button>
+            {!obrigatorio && (
+              <Button type="button" variant="outline" onClick={() => { reset(); onClose() }} className="flex-1 rounded-xl" disabled={loading}>
+                Cancelar
+              </Button>
+            )}
             <Button type="submit" disabled={loading} className="flex-1 bg-green-700 hover:bg-green-800 rounded-xl">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar'}
             </Button>

@@ -96,6 +96,7 @@ model Corretor {
   creci             String         @unique
   email             String         @unique
   senha             String         // bcrypt hash — definida no cadastro ou gerada e enviada por WhatsApp
+  senha_provisoria  Boolean        @default(false)  // true = precisa trocar no 1º acesso (ex.: importados com CPF)
   telefone          String
   whatsapp          String
   whatsapp_opt_in   Boolean        @default(false)   // LGPD: consentiu receber notificações

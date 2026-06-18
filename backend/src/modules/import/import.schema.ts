@@ -67,8 +67,8 @@ export const corretorRowSchema = z.object({
   cpf,
   creci:            z.string().trim().min(1, 'CRECI obrigatório'),
   email:            z.string().trim().email('E-mail inválido'),
-  telefone,
-  whatsapp:         telefone,
+  telefone:         telefone.optional().or(z.literal('')),   // opcional (legado)
+  whatsapp:         telefone,                                 // obrigatório
   cidade:           z.string().trim().min(1, 'Cidade obrigatória'),
   uf,
   instagram:        z.string().trim().optional(),

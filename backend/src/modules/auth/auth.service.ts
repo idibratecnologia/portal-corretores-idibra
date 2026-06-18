@@ -6,7 +6,7 @@ import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { hashPassword, verifyPassword } from '@/lib/hash'
 import { signAccessToken, signRefreshToken, verifyToken } from '@/lib/jwt'
-import { UnauthorizedError, ConflictError, ForbiddenError, BadRequestError } from '@/lib/errors'
+import { UnauthorizedError, ConflictError, ForbiddenError, BadRequestError, NotFoundError } from '@/lib/errors'
 import { notify } from '@/lib/notifications'
 import { emitAdminRefresh } from '@/lib/events'
 import { config } from '@/config'
@@ -89,7 +89,7 @@ export async function cadastrarCorretor(input: CadastroInput): Promise<{ id: str
       creci:           input.creci,
       email:           input.email,
       senha:           senhaHash,
-      telefone:        input.telefone,
+      telefone:        input.telefone || input.whatsapp,
       whatsapp:        input.whatsapp,
       whatsapp_opt_in: input.whatsapp_opt_in ?? false,
       instagram:       input.instagram,
@@ -163,7 +163,7 @@ export async function trocarSenha(
   if (!(await verifyPassword(senhaAtual, corretor.senha))) {
     throw new BadRequestError('Senha atual incorreta')
   }
-  await prisma.corretor.update({ where: { id: userId }, data: { senha: await hashPassword(novaSenha) } })
+  await prisma.corretor.update({ where: { id: userId }, data: { senha: await hashPassword(novaSenha), senha_provisoria: false } })
 }
 
 // ─── Esqueci minha senha (público) ───────────────────────────────
@@ -180,22 +180,15 @@ export async function esqueciSenha(email: string): Promise<void> {
   // E-mail não encontrado → retorna silenciosamente (sem enumeração)
   if (!admin && !corretor) return
 
-  const token = randomBytes(32).toString('hex')
-  const expires = new Date(Date.now() + 60 * 60 * 1000) // 1 hora
+  const link = await gerarLinkReset(email)
 
-  await prisma.passwordReset.create({
-    data: { email, token, expires_at: expires },
-  })
-
-  const link = `${config.portalUrl}/resetar-senha?token=${token}`
-
-  // Entrega via WhatsApp (corretor com opt-in). Em dev sem Evolution, o stub loga.
+  // Entrega via WhatsApp (transacional — sempre envia).
   if (corretor) {
     await notify({
       corretorId: corretor.id,
-      tipo:       'aprovacao', // reusa o canal; tipo específico pode ser criado no Bloco 4
+      tipo:       'aprovacao',
       whatsapp:   corretor.whatsapp,
-      optIn:      true, // reset de senha é transacional — sempre envia
+      optIn:      true,
       mensagem:
         `🔑 *Redefinição de senha*\n\nOlá, ${corretor.nome}! Recebemos um pedido para redefinir sua senha.\n\n` +
         `Acesse o link para criar uma nova senha (válido por 1 hora):\n${link}\n\n` +
@@ -205,6 +198,36 @@ export async function esqueciSenha(email: string): Promise<void> {
 
   // Log para o operador conseguir o token em dev (até o WhatsApp estar ativo)
   console.log(`[reset-senha] ${email} → ${link}`)
+}
+
+/** Cria um token de reset (válido por 1h) e devolve o link do portal. */
+async function gerarLinkReset(email: string): Promise<string> {
+  const token = randomBytes(32).toString('hex')
+  const expires = new Date(Date.now() + 60 * 60 * 1000)
+  await prisma.passwordReset.create({ data: { email, token, expires_at: expires } })
+  return `${config.portalUrl}/resetar-senha?token=${token}`
+}
+
+/**
+ * Admin: gera o token e envia o LINK de redefinição pelo WhatsApp do corretor.
+ * (mesmo fluxo do "Esqueci a senha", mas iniciado pelo admin a partir do ID).
+ */
+export async function enviarLinkResetCorretor(corretorId: string): Promise<{ whatsapp: string }> {
+  const corretor = await prisma.corretor.findUnique({ where: { id: corretorId } })
+  if (!corretor) throw new NotFoundError('Corretor não encontrado')
+
+  const link = await gerarLinkReset(corretor.email)
+  await notify({
+    corretorId: corretor.id,
+    tipo:       'aprovacao',
+    whatsapp:   corretor.whatsapp,
+    optIn:      true,
+    mensagem:
+      `🔑 *Redefinição de senha*\n\nOlá, ${corretor.nome}! O administrador da IDIBRA gerou um link para você criar uma nova senha.\n\n` +
+      `Acesse (válido por 1 hora):\n${link}`,
+  })
+  console.log(`[reset-senha:admin] ${corretor.email} → ${link}`)
+  return { whatsapp: corretor.whatsapp }
 }
 
 // ─── Resetar senha com token ─────────────────────────────────────

@@ -36,7 +36,6 @@ const schema = z.object({
   nome: z.string().min(1, 'Nome obrigatório'),
   cpf: z.string().min(14, 'CPF inválido'),
   creci: z.string().min(1, 'CRECI obrigatório'),
-  telefone: z.string().min(14, 'Telefone inválido'),
   whatsapp: z.string().min(14, 'WhatsApp inválido'),
   imobiliaria_id: z.string().optional(),
   cidade: z.string().min(1, 'Cidade obrigatória'),
@@ -75,7 +74,6 @@ export function CorretorPerfil() {
       nome: corretor?.nome || '',
       cpf: maskCPF(corretor?.cpf || ''),
       creci: corretor?.creci || '',
-      telefone: maskPhone(corretor?.telefone || ''),
       whatsapp: maskPhone(corretor?.whatsapp || ''),
       imobiliaria_id: corretor?.imobiliaria_id || '',
       cidade: corretor?.cidade || '',
@@ -85,7 +83,7 @@ export function CorretorPerfil() {
     },
   })
 
-  function maskedField(field: 'cpf' | 'telefone' | 'whatsapp', mask: (v: string) => string) {
+  function maskedField(field: 'cpf' | 'whatsapp', mask: (v: string) => string) {
     const { onChange, ...rest } = register(field)
     return {
       ...rest,
@@ -147,7 +145,6 @@ export function CorretorPerfil() {
           nome:           data.nome,
           cpf:            data.cpf,
           creci:          data.creci,
-          telefone:       data.telefone,
           whatsapp:       data.whatsapp,
           imobiliaria_id: data.imobiliaria_id || undefined,
           cidade:         data.cidade,
@@ -298,12 +295,6 @@ export function CorretorPerfil() {
               </div>
 
               <div>
-                <Label>Telefone *</Label>
-                <Input {...maskedField('telefone', maskPhone)} placeholder="(00) 00000-0000" className="mt-1" />
-                {errors.telefone && <p className="text-xs text-red-500 mt-1">{errors.telefone.message}</p>}
-              </div>
-
-              <div>
                 <Label>WhatsApp *</Label>
                 <Input {...maskedField('whatsapp', maskPhone)} placeholder="(00) 00000-0000" className="mt-1" />
                 {errors.whatsapp && <p className="text-xs text-red-500 mt-1">{errors.whatsapp.message}</p>}
@@ -374,7 +365,6 @@ export function CorretorPerfil() {
               { icon: User,          label: 'CPF',        value: corretor?.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') },
               { icon: User,          label: 'CRECI',      value: corretor?.creci },
               { icon: Mail,          label: 'E-mail',     value: corretor?.email,    href: corretor?.email ? `mailto:${corretor.email}` : undefined },
-              { icon: Phone,         label: 'Telefone',   value: corretor?.telefone, href: corretor?.telefone ? `tel:+55${corretor.telefone.replace(/\D/g, '')}` : undefined },
               { icon: MessageCircle, label: 'WhatsApp',   value: corretor?.whatsapp, href: corretor?.whatsapp ? `https://wa.me/55${corretor.whatsapp.replace(/\D/g, '')}` : undefined, external: true },
               { icon: Instagram,     label: 'Instagram',  value: corretor?.instagram || '—' },
               { icon: Cake,          label: 'Aniversário', value: corretor?.data_nascimento ? new Date(corretor.data_nascimento).toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }) : '—' },

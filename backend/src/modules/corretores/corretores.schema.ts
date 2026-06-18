@@ -22,7 +22,7 @@ export const createCorretorSchema = z.object({
   creci:          z.string().min(1, 'CRECI obrigatório'),
   email:          z.string().email('E-mail inválido'),
   senha:          z.string().min(6, 'Senha deve ter no mínimo 6 caracteres').optional(),
-  telefone:       z.string().min(14, 'Telefone inválido'),
+  telefone:       z.string().optional(),   // legado — preenchido a partir do WhatsApp
   whatsapp:       z.string().min(14, 'WhatsApp inválido'),
   whatsapp_opt_in: z.boolean().optional(),
   instagram:      z.string().optional(),

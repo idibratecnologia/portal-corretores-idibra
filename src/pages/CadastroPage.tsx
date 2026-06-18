@@ -76,7 +76,7 @@ export function CadastroPage() {
 
   const [form, setForm] = useState({
     nome: '', cpf: '', creci: '', email: '',
-    telefone: '', whatsapp: '', instagram: '',
+    whatsapp: '', instagram: '',
     imobiliaria_id: '', cidade: '', uf: 'CE',
     data_nascimento: '',
     password: '', confirmPassword: '',
@@ -97,7 +97,6 @@ export function CadastroPage() {
     if (form.cpf.replace(/\D/g,'').length < 11) errs.cpf      = 'CPF inválido'
     if (!form.creci.trim())                     errs.creci     = 'CRECI obrigatório'
     if (!form.email.includes('@'))              errs.email     = 'E-mail inválido'
-    if (form.telefone.replace(/\D/g,'').length < 10) errs.telefone = 'Telefone inválido'
     if (form.whatsapp.replace(/\D/g,'').length < 10) errs.whatsapp = 'WhatsApp inválido'
     if (!form.cidade.trim())                    errs.cidade    = 'Cidade obrigatória'
     if (!form.data_nascimento) {
@@ -125,7 +124,6 @@ export function CadastroPage() {
         creci:    form.creci,
         email:    form.email,
         senha:    form.password,
-        telefone: form.telefone,
         whatsapp: form.whatsapp,
         instagram: form.instagram || undefined,
         imobiliaria_id: form.imobiliaria_id || undefined,
@@ -242,29 +240,18 @@ export function CadastroPage() {
                 error={fieldErrors.email}
               />
 
-              {/* Telefone + WhatsApp */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <div className="relative">
-                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      placeholder="Telefone *"
-                      value={form.telefone}
-                      onChange={set('telefone', maskPhone)}
-                      className={`${iconInputCls} ${fieldErrors.telefone ? 'border-red-300' : ''}`}
-                    />
-                  </div>
-                  {fieldErrors.telefone && <p className="text-xs text-red-500 mt-1 pl-1">{fieldErrors.telefone}</p>}
-                </div>
-                <div>
+              {/* WhatsApp */}
+              <div>
+                <div className="relative">
+                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     placeholder="WhatsApp *"
                     value={form.whatsapp}
                     onChange={set('whatsapp', maskPhone)}
-                    className={`${inputCls} ${fieldErrors.whatsapp ? 'border-red-300' : ''}`}
+                    className={`${iconInputCls} ${fieldErrors.whatsapp ? 'border-red-300' : ''}`}
                   />
-                  {fieldErrors.whatsapp && <p className="text-xs text-red-500 mt-1 pl-1">{fieldErrors.whatsapp}</p>}
                 </div>
+                {fieldErrors.whatsapp && <p className="text-xs text-red-500 mt-1 pl-1">{fieldErrors.whatsapp}</p>}
               </div>
 
               {/* Instagram (opcional) */}

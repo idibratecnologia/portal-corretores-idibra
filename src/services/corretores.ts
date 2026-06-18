@@ -64,7 +64,7 @@ export async function fetchMeuPerfil(): Promise<Corretor> {
 /** Auto-cadastro público de corretor (sem auth). Nasce pendente. */
 export interface CadastroData {
   nome: string; cpf: string; creci: string; email: string; senha: string
-  telefone: string; whatsapp: string; instagram?: string
+  telefone?: string; whatsapp: string; instagram?: string
   imobiliaria_id?: string; cidade: string; uf: string
   data_nascimento?: string
   whatsapp_opt_in?: boolean

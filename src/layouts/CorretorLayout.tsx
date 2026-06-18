@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Toaster } from '@/components/ui/toaster'
 import { NotificationBell } from '@/components/shared/NotificationBell'
 import { RouteFallback } from '@/components/shared/RouteFallback'
+import { TrocarSenhaModal } from '@/components/shared/TrocarSenhaModal'
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/portal/home':       { title: 'Início',      subtitle: 'Bem-vindo ao portal IDIBRA'           },
@@ -36,11 +37,20 @@ function CorretorTopbar() {
 }
 
 export function CorretorLayout() {
-  const { role } = useAuth()
+  const { role, corretor } = useAuth()
   const location = useLocation()
 
   if (role !== 'corretor') {
     return <Navigate to="/login" replace />
+  }
+
+  // 1º acesso (ex.: importado com CPF) → troca de senha obrigatória
+  if (corretor?.senha_provisoria) {
+    return (
+      <div className="min-h-screen bg-gray-50/70">
+        <TrocarSenhaModal open obrigatorio onClose={() => window.location.reload()} />
+      </div>
+    )
   }
 
   return (

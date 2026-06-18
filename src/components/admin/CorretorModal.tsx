@@ -41,7 +41,6 @@ const schema = z.object({
   cpf: z.string().min(14, 'CPF inválido'),
   creci: z.string().min(1, 'CRECI obrigatório'),
   email: z.string().email('E-mail inválido'),
-  telefone: z.string().min(14, 'Telefone inválido'),
   whatsapp: z.string().min(14, 'WhatsApp inválido'),
   imobiliaria_id: z.string().optional(),
   cidade: z.string().min(1, 'Cidade obrigatória'),
@@ -84,7 +83,6 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
         cpf: maskCPF(corretor.cpf || ''),
         creci: corretor.creci,
         email: corretor.email,
-        telefone: maskPhone(corretor.telefone || ''),
         whatsapp: maskPhone(corretor.whatsapp || ''),
         imobiliaria_id: corretor.imobiliaria_id || '',
         cidade: corretor.cidade,
@@ -103,7 +101,7 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
     onSave({ ...data, data_nascimento: data.data_nascimento || null })
 
   function maskedField(
-    field: 'cpf' | 'telefone' | 'whatsapp',
+    field: 'cpf' | 'whatsapp',
     mask: (v: string) => string
   ) {
     const { onChange, ...rest } = register(field)
@@ -147,12 +145,6 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
               <Label>E-mail *</Label>
               <Input type="email" {...register('email')} className="mt-1" />
               {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
-            </div>
-
-            <div>
-              <Label>Telefone *</Label>
-              <Input {...maskedField('telefone', maskPhone)} placeholder="(00) 00000-0000" className="mt-1" />
-              {errors.telefone && <p className="text-xs text-red-500 mt-1">{errors.telefone.message}</p>}
             </div>
 
             <div>

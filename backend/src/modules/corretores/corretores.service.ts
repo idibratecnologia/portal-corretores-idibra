@@ -9,6 +9,7 @@ import { notify } from '@/lib/notifications'
 import { saveImage, deleteImage } from '@/lib/storage'
 import { resolvePagination, buildPaginated } from '@/lib/pagination'
 import { renderMensagem } from '@/modules/templates/templates.service'
+import { enviarLinkResetCorretor } from '@/modules/auth/auth.service'
 import { emitAdminRefresh } from '@/lib/events'
 import { config } from '@/config'
 import type { ListCorretoresInput, CreateCorretorInput, UpdateCorretorInput } from './corretores.schema'
@@ -25,6 +26,7 @@ const corretorSelect = {
   telefone:        true,
   whatsapp:        true,
   whatsapp_opt_in: true,
+  senha_provisoria: true,
   instagram:       true,
   data_nascimento: true,
   cidade:          true,
@@ -104,7 +106,7 @@ export async function createCorretor(input: CreateCorretorInput) {
       creci:           input.creci,
       email:           input.email,
       senha:           senhaHash,
-      telefone:        input.telefone,
+      telefone:        input.telefone || input.whatsapp,
       whatsapp:        input.whatsapp,
       whatsapp_opt_in: input.whatsapp_opt_in ?? false,
       instagram:       input.instagram,
@@ -148,6 +150,8 @@ export async function updateCorretor(id: string, input: UpdateCorretorInput) {
     data: {
       ...input,
       uf: input.uf ? input.uf.toUpperCase() : undefined,
+      // telefone é legado: mantém sincronizado com o WhatsApp
+      telefone: input.telefone || input.whatsapp || undefined,
     },
     select: corretorSelect,
   })
@@ -208,17 +212,12 @@ export async function updateFoto(id: string, buffer: Buffer): Promise<{ foto_url
 }
 
 /**
- * Admin reseta a senha de um corretor: gera uma senha temporária,
- * salva o hash e retorna a senha em texto puro para o admin repassar.
+ * Admin solicita o reset de senha de um corretor: gera um token e envia o
+ * LINK de redefinição pelo WhatsApp do corretor (mesmo fluxo do "Esqueci a senha").
  */
-export async function resetSenhaAdmin(id: string): Promise<{ senha_temporaria: string }> {
-  await ensureExists(id)
-  const senha_temporaria = Math.random().toString(36).slice(-4) + Math.random().toString(36).slice(-4).toUpperCase()
-  await prisma.corretor.update({
-    where: { id },
-    data:  { senha: await hashPassword(senha_temporaria) },
-  })
-  return { senha_temporaria }
+export async function resetSenhaAdmin(id: string): Promise<{ enviado: true; whatsapp: string }> {
+  const { whatsapp } = await enviarLinkResetCorretor(id)
+  return { enviado: true, whatsapp }
 }
 
 /** Exclui um corretor (e suas inscrições via cascade). Remove a foto do storage. */

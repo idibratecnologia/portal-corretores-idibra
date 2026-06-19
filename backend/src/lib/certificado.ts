@@ -21,6 +21,19 @@ function dataPorExtenso(d: Date): string {
   })
 }
 
+/** Embute um PNG (arte de um modelo visual) numa página PDF do tamanho do modelo. */
+export function pngParaPdf(png: Buffer, width: number, height: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: [width, height], margin: 0 })
+    const chunks: Buffer[] = []
+    doc.on('data', (c: Buffer) => chunks.push(c))
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
+    doc.image(png, 0, 0, { width, height })
+    doc.end()
+  })
+}
+
 export function gerarCertificadoPdf(data: CertificadoData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0 })

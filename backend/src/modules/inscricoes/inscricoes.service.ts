@@ -7,7 +7,9 @@ import { config } from '@/config'
 import { NotFoundError, BadRequestError, ConflictError, ForbiddenError } from '@/lib/errors'
 import { notify, notifyDocument } from '@/lib/notifications'
 import { getConnectionState } from '@/lib/evolution'
-import { gerarCertificadoPdf } from '@/lib/certificado'
+import { gerarCertificadoPdf, pngParaPdf } from '@/lib/certificado'
+import { renderModeloPng } from '@/lib/modelo-render'
+import { getModeloDoEvento, construirDadosInscricao } from '@/modules/modelos/modelos.service'
 import { emitAdminRefresh } from '@/lib/events'
 import { renderMensagem } from '@/modules/templates/templates.service'
 import { gerarQrCheckinBase64 } from '@/lib/qrcode'
@@ -163,6 +165,22 @@ function slugArquivo(s: string): string {
     .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase().slice(0, 40) || 'certificado'
 }
 
+interface CertFallback { nome: string; creci?: string | null; eventoTitulo: string; dataEvento: Date; local?: string | null }
+
+/**
+ * Gera o PDF do certificado: usa o MODELO VISUAL vinculado ao evento (se houver
+ * um ativo com layout salvo); caso contrário, cai no certificado padrão.
+ */
+async function montarCertificadoPdf(inscricaoId: string, eventoId: string, fallback: CertFallback): Promise<Buffer> {
+  const modelo = await getModeloDoEvento(eventoId, 'certificado')
+  if (modelo && modelo.ativo && modelo.canvas_json) {
+    const dados = await construirDadosInscricao(inscricaoId, 'certificado')
+    const png = await renderModeloPng(modelo.canvas_json, modelo.largura, modelo.altura, dados)
+    return pngParaPdf(png, modelo.largura, modelo.altura)
+  }
+  return gerarCertificadoPdf(fallback)
+}
+
 /** Gera o PDF do certificado de uma inscrição (do corretor logado), se elegível. */
 export async function gerarCertificadoInscricao(
   inscricaoId: string,
@@ -180,7 +198,7 @@ export async function gerarCertificadoInscricao(
   if (insc.status !== 'presente') throw new BadRequestError('Certificado disponível apenas para presença confirmada.')
   if (!insc.evento.certificados_habilitados) throw new BadRequestError('Os certificados deste evento ainda não foram liberados.')
 
-  const pdf = await gerarCertificadoPdf({
+  const pdf = await montarCertificadoPdf(insc.id, insc.evento_id, {
     nome: insc.corretor.nome, creci: insc.corretor.creci,
     eventoTitulo: insc.evento.titulo, dataEvento: insc.evento.data_evento, local: insc.evento.local,
   })
@@ -211,7 +229,7 @@ export async function enviarCertificadosEvento(
     const c = insc.corretor
     if (!c.whatsapp_opt_in || !c.whatsapp) { semOptIn++; continue }
 
-    const pdf = await gerarCertificadoPdf({
+    const pdf = await montarCertificadoPdf(insc.id, eventoId, {
       nome: c.nome, creci: c.creci,
       eventoTitulo: evento.titulo, dataEvento: evento.data_evento, local: evento.local,
     })

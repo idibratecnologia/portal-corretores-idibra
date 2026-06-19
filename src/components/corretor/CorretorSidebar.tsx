@@ -1,7 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import idibraLogo from '@/assets/idibra_logo.png'
-import { Home, Calendar, ClipboardList, History, User, LogOut, Menu, X, ChevronRight, GraduationCap } from 'lucide-react'
-import { useState } from 'react'
+import { Home, Calendar, ClipboardList, History, User, LogOut, ChevronRight, GraduationCap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -129,24 +128,14 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   )
 }
 
-export function CorretorSidebar() {
-  const [mobileOpen, setMobileOpen] = useState(false)
-
+export function CorretorSidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
   return (
     <>
-      {/* Mobile toggle */}
-      <button
-        className="fixed top-4 left-4 z-50 p-2 bg-slate-800 text-slate-200 rounded-xl lg:hidden shadow-xl border border-slate-700"
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
-        {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-      </button>
-
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setMobileOpen(false)}
+          onClick={onClose}
         />
       )}
 
@@ -157,7 +146,7 @@ export function CorretorSidebar() {
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <SidebarContent onClose={() => setMobileOpen(false)} />
+        <SidebarContent onClose={onClose} />
       </div>
 
       {/* Desktop sidebar */}

@@ -13,8 +13,12 @@ import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/errors'
+import { RelatorioIndividualModal } from '@/components/admin/RelatorioIndividualModal'
 
 type Tab = 'eventos' | 'corretores' | 'participacoes'
+type Alvo =
+  | { tipo: 'corretor'; dados: RelatorioCorretor }
+  | { tipo: 'evento'; dados: RelatorioEvento }
 
 const PERIODOS: { key: Periodo; label: string }[] = [
   { key: '7d',   label: '7 dias'   },
@@ -48,6 +52,7 @@ export function AdminRelatorios() {
   const [eventStats, setEventStats]       = useState<RelatorioEvento[]>([])
   const [corretorStats, setCorretorStats] = useState<RelatorioCorretor[]>([])
   const [participacoes, setParticipacoes] = useState<RelatorioParticipacao[]>([])
+  const [alvo, setAlvo] = useState<Alvo | null>(null)
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -189,6 +194,7 @@ export function AdminRelatorios() {
                     <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 hidden sm:table-cell">Presentes</th>
                     <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 hidden md:table-cell">Ausentes</th>
                     <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500">Taxa</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">Relatório</th>
                   </tr>
                 </thead>
                 {isLoading ? (
@@ -208,6 +214,11 @@ export function AdminRelatorios() {
                         <td className="px-4 py-3 text-center hidden md:table-cell font-semibold text-red-500">{e.ausentes}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={taxaBadge(e.taxa)}>{e.taxa}%</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button onClick={() => setAlvo({ tipo: 'evento', dados: e })} title="Relatório individual" className="inline-flex items-center gap-1 text-xs font-medium text-green-700 hover:bg-green-50 px-2 py-1 rounded-lg">
+                            <FileText className="w-3.5 h-3.5" /> Ver
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -236,6 +247,7 @@ export function AdminRelatorios() {
                     <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500">Eventos</th>
                     <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500">Participações</th>
                     <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500">Taxa</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">Relatório</th>
                   </tr>
                 </thead>
                 {isLoading ? (
@@ -263,6 +275,11 @@ export function AdminRelatorios() {
                         <td className="px-4 py-3 text-center font-semibold text-green-700">{c.presentes}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={taxaBadge(c.taxa)}>{c.taxa}%</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button onClick={() => setAlvo({ tipo: 'corretor', dados: c })} title="Relatório individual" className="inline-flex items-center gap-1 text-xs font-medium text-green-700 hover:bg-green-50 px-2 py-1 rounded-lg">
+                            <FileText className="w-3.5 h-3.5" /> Ver
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -324,6 +341,8 @@ export function AdminRelatorios() {
           </div>
         )}
       </div>
+
+      <RelatorioIndividualModal alvo={alvo} onClose={() => setAlvo(null)} />
     </div>
   )
 }

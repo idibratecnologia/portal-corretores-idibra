@@ -68,21 +68,32 @@ export async function enviarTesteTexto(numero: string, texto: string): Promise<v
 export async function broadcast(
   mensagem: string,
   corretorIds: string[],
-): Promise<{ total: number; enfileirados: number; semOptIn: number }> {
+  opts: { whatsapp: boolean; email: boolean; assunto?: string } = { whatsapp: true, email: false },
+): Promise<{ total: number; whatsapp: number; emails: number; semCanal: number }> {
   const corretores = await prisma.corretor.findMany({
     where:  { id: { in: corretorIds } },
-    select: { id: true, nome: true, whatsapp: true, whatsapp_opt_in: true },
+    select: { id: true, nome: true, whatsapp: true, whatsapp_opt_in: true, email: true },
   })
 
-  let enfileirados = 0
-  let semOptIn = 0
+  let whatsappCount = 0
+  let emailsCount = 0
+  let semCanal = 0
   for (const c of corretores) {
-    if (!c.whatsapp_opt_in || !c.whatsapp) { semOptIn++; continue }
+    const podeWhats = opts.whatsapp && !!c.whatsapp_opt_in && !!c.whatsapp
+    const podeEmail = opts.email && !!c.email
+    if (!podeWhats && !podeEmail) { semCanal++; continue }
+
     await notify({
-      corretorId: c.id, tipo: 'broadcast', whatsapp: c.whatsapp, optIn: true,
-      mensagem: mensagem.replace(/\{nome\}/g, c.nome.split(' ')[0]),
+      corretorId: c.id,
+      tipo:       'broadcast',
+      whatsapp:   c.whatsapp,
+      optIn:      c.whatsapp_opt_in,
+      mensagem:   mensagem.replace(/\{nome\}/g, c.nome.split(' ')[0]),
+      canais:     { whatsapp: opts.whatsapp, email: opts.email },
+      assunto:    opts.assunto,
     })
-    enfileirados++
+    if (podeWhats) whatsappCount++
+    if (podeEmail) emailsCount++
   }
-  return { total: corretores.length, enfileirados, semOptIn }
+  return { total: corretores.length, whatsapp: whatsappCount, emails: emailsCount, semCanal }
 }

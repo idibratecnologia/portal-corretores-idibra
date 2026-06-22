@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Send, Search, Loader2, Megaphone, Check, AlertTriangle } from 'lucide-react'
+import { Send, Search, Loader2, Megaphone, Check, AlertTriangle, MessageCircle, Mail } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -23,6 +23,10 @@ export function AdminDisparos() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirmar, setConfirmar] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  // Canais do disparo
+  const [canalWhats, setCanalWhats] = useState(true)
+  const [canalEmail, setCanalEmail] = useState(false)
+  const [assunto, setAssunto] = useState('')
 
   // filtros
   const [busca, setBusca] = useState('')
@@ -74,10 +78,17 @@ export function AdminDisparos() {
     setConfirmar(false)
     setEnviando(true)
     try {
-      const r = await dispararEmMassa(mensagem.trim(), [...selected])
+      const r = await dispararEmMassa(
+        mensagem.trim(), [...selected],
+        { whatsapp: canalWhats, email: canalEmail },
+        canalEmail ? (assunto.trim() || undefined) : undefined,
+      )
+      const partes: string[] = []
+      if (canalWhats) partes.push(`WhatsApp: ${r.whatsapp}`)
+      if (canalEmail) partes.push(`E-mail: ${r.emails}`)
       toast({
         title: 'Disparo iniciado',
-        description: `${r.enfileirados} mensagem(ns) na fila${r.semOptIn ? ` · ${r.semOptIn} sem opt-in/WhatsApp` : ''}.`,
+        description: `${partes.join(' · ')}${r.semCanal ? ` · ${r.semCanal} sem canal disponível` : ''}.`,
       })
       setSelected(new Set()); setMensagem('')
     } catch (err) {
@@ -87,13 +98,17 @@ export function AdminDisparos() {
     }
   }
 
-  const podeEnviar = mensagem.trim().length > 0 && selected.size > 0
+  const comEmail = selecionados.filter((c) => c.email).length
+  const semNenhumCanal = selecionados.filter(
+    (c) => !((canalWhats && c.whatsapp_opt_in && c.whatsapp) || (canalEmail && c.email)),
+  ).length
+  const podeEnviar = mensagem.trim().length > 0 && selected.size > 0 && (canalWhats || canalEmail)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Megaphone className="w-6 h-6 text-green-600" /> Disparo em massa</h1>
-        <p className="text-gray-500 text-sm mt-1">Envie uma mensagem por WhatsApp para os corretores selecionados (respeita o opt-in e a fila).</p>
+        <p className="text-gray-500 text-sm mt-1">Envie uma mensagem por <strong>WhatsApp</strong> e/ou <strong>e-mail</strong> para os corretores selecionados (respeita o opt-in e a fila).</p>
       </div>
 
       <div className="grid lg:grid-cols-5 gap-6">
@@ -108,6 +123,26 @@ export function AdminDisparos() {
             </div>
           </div>
 
+          {/* Canais */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-3">
+            <p className="text-sm font-semibold text-gray-700">Canais</p>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={canalWhats} onChange={(e) => setCanalWhats(e.target.checked)} className="rounded border-gray-300 accent-green-600" />
+              <MessageCircle className="w-4 h-4 text-green-600" /> WhatsApp <span className="text-[11px] text-gray-400">(respeita opt-in)</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={canalEmail} onChange={(e) => setCanalEmail(e.target.checked)} className="rounded border-gray-300 accent-green-600" />
+              <Mail className="w-4 h-4 text-green-600" /> E-mail (Outlook)
+            </label>
+            {canalEmail && (
+              <div>
+                <label className="text-xs text-gray-500">Assunto do e-mail</label>
+                <Input value={assunto} onChange={(e) => setAssunto(e.target.value)} placeholder="IDIBRA — Comunicado" className="mt-1" />
+              </div>
+            )}
+            {!canalWhats && !canalEmail && <p className="text-[11px] text-amber-600">Selecione ao menos um canal.</p>}
+          </div>
+
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">Selecionados</span>
@@ -118,12 +153,20 @@ export function AdminDisparos() {
                 )}
               </span>
             </div>
-            <div className="flex items-center justify-between text-sm mt-1">
-              <span className="text-gray-500">Com WhatsApp (opt-in)</span>
-              <span className="font-bold text-green-700">{comOptIn}</span>
-            </div>
-            {selected.size > 0 && comOptIn < selected.size && (
-              <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> {selected.size - comOptIn} selecionado(s) não receberão (sem opt-in/WhatsApp).</p>
+            {canalWhats && (
+              <div className="flex items-center justify-between text-sm mt-1">
+                <span className="text-gray-500">Com WhatsApp (opt-in)</span>
+                <span className="font-bold text-green-700">{comOptIn}</span>
+              </div>
+            )}
+            {canalEmail && (
+              <div className="flex items-center justify-between text-sm mt-1">
+                <span className="text-gray-500">Com e-mail</span>
+                <span className="font-bold text-green-700">{comEmail}</span>
+              </div>
+            )}
+            {selected.size > 0 && semNenhumCanal > 0 && (
+              <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> {semNenhumCanal} selecionado(s) não receberão por nenhum canal escolhido.</p>
             )}
             <Button onClick={() => setConfirmar(true)} disabled={!podeEnviar || enviando} className="w-full mt-4 bg-green-700 hover:bg-green-800 gap-2">
               {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Enviar disparo
@@ -190,8 +233,10 @@ export function AdminDisparos() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar disparo?</AlertDialogTitle>
             <AlertDialogDescription>
-              A mensagem será enviada para <strong>{comOptIn}</strong> corretor(es) com WhatsApp/opt-in
-              {selected.size - comOptIn > 0 && ` (${selected.size - comOptIn} serão ignorados)`}. O envio respeita a fila.
+              A mensagem será enviada {canalWhats && <>por <strong>WhatsApp</strong> a <strong>{comOptIn}</strong> (opt-in)</>}
+              {canalWhats && canalEmail && ' e '}
+              {canalEmail && <>por <strong>e-mail</strong> a <strong>{comEmail}</strong></>}
+              {' '}corretor(es).{semNenhumCanal > 0 && ` ${semNenhumCanal} sem canal disponível serão ignorados.`} O envio respeita a fila.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

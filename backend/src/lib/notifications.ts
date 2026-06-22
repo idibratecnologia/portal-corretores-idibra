@@ -12,6 +12,9 @@ import { config } from '@/config'
 import { sendText, sendMedia, sendDocument } from '@/lib/evolution'
 import { resolveMediaForSend } from '@/lib/storage'
 import { enqueueWhatsApp } from '@/lib/whatsapp-queue'
+import { emailEnabled, sendEmail, type EmailAttachment } from '@/lib/email-graph'
+import { montarHtmlEmail } from '@/lib/email-template'
+import { enqueueEmail } from '@/lib/email-queue'
 
 export type NotificacaoTipo =
   | 'inscricao_confirmada'
@@ -24,6 +27,37 @@ export type NotificacaoTipo =
   | 'certificado'
   | 'broadcast'
 
+const ASSUNTO_EMAIL: Record<NotificacaoTipo, string> = {
+  inscricao_confirmada:  'Inscrição confirmada — IDIBRA',
+  lembrete_antecedencia: 'Lembrete do seu evento — IDIBRA',
+  lembrete_dia:          'Seu evento é hoje — IDIBRA',
+  aprovacao:             'IDIBRA — Sua conta',
+  checkin:               'Check-in confirmado — IDIBRA',
+  cancelamento_evento:   'Evento cancelado — IDIBRA',
+  evento_novo:           'Novo evento — IDIBRA',
+  certificado:           'Seu certificado de participação — IDIBRA',
+  broadcast:             'IDIBRA — Comunicado',
+}
+
+/**
+ * Envia o e-mail da notificação (canal paralelo ao WhatsApp), via Microsoft Graph.
+ * Best-effort: não bloqueia nem derruba o fluxo se falhar/estiver desativado.
+ */
+function enviarEmailNotificacao(
+  corretorId: string, tipo: NotificacaoTipo, mensagem: string, attachments?: EmailAttachment[], assunto?: string,
+): void {
+  if (!emailEnabled()) return
+  enqueueEmail(async () => {
+    const corretor = await prisma.corretor.findUnique({ where: { id: corretorId }, select: { email: true } })
+    if (!corretor?.email) return
+    await sendEmail({ to: corretor.email, subject: assunto || ASSUNTO_EMAIL[tipo], html: montarHtmlEmail(mensagem), attachments })
+    console.log(`[email] (${tipo}) → ${corretor.email}`)
+  })
+}
+
+/** Canais de uma notificação. Por padrão tenta os dois. */
+export interface Canais { whatsapp?: boolean; email?: boolean }
+
 interface NotifyParams {
   corretorId:    string
   eventoId?:     string
@@ -33,6 +67,8 @@ interface NotifyParams {
   mensagem:      string
   imagemUrl?:    string   // URL (storage ou externa) — enviada como imagem + legenda
   imagemBase64?: string   // imagem já em base64 (ex.: QR gerado) — enviada direto
+  canais?:       Canais   // padrão: WhatsApp + e-mail
+  assunto?:      string   // assunto do e-mail (sobrescreve o padrão do tipo)
 }
 
 /**
@@ -40,10 +76,13 @@ interface NotifyParams {
  * Respeita o opt-in do corretor (LGPD): se não consentiu, não envia.
  */
 export async function notify(params: NotifyParams): Promise<void> {
-  const { corretorId, eventoId, tipo, whatsapp, optIn, mensagem, imagemUrl, imagemBase64 } = params
+  const { corretorId, eventoId, tipo, whatsapp, optIn, mensagem, imagemUrl, imagemBase64, canais, assunto } = params
 
-  // LGPD: só dispara se o corretor consentiu
-  if (!optIn) return
+  // E-mail: canal independente (não usa o opt-in de WhatsApp). Best-effort.
+  if (canais?.email !== false) enviarEmailNotificacao(corretorId, tipo, mensagem, undefined, assunto)
+
+  // WhatsApp: respeita o opt-in (LGPD) e a seleção de canal
+  if (canais?.whatsapp === false || !optIn) return
 
   const temImagem = Boolean(imagemUrl || imagemBase64)
 
@@ -88,6 +127,7 @@ interface NotifyDocParams {
   base64:     string   // documento (ex.: PDF) em base64
   fileName:   string
   caption:    string
+  canais?:    Canais
 }
 
 /**
@@ -95,8 +135,14 @@ interface NotifyDocParams {
  * Respeita o opt-in do corretor (LGPD).
  */
 export async function notifyDocument(params: NotifyDocParams): Promise<void> {
-  const { corretorId, eventoId, tipo, whatsapp, optIn, base64, fileName, caption } = params
-  if (!optIn) return
+  const { corretorId, eventoId, tipo, whatsapp, optIn, base64, fileName, caption, canais } = params
+
+  // E-mail com o documento em anexo (canal independente do opt-in)
+  if (canais?.email !== false) {
+    enviarEmailNotificacao(corretorId, tipo, caption, [{ name: fileName, contentBytes: base64, contentType: 'application/pdf' }])
+  }
+
+  if (canais?.whatsapp === false || !optIn) return
 
   if (!config.evolution.enabled) {
     console.log(`[notify:stub doc] (${tipo}) → ${whatsapp} [${fileName}]`)

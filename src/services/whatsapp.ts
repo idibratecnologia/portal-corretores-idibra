@@ -42,11 +42,15 @@ export async function enviarTesteWhatsapp(payload: TesteWhatsapp): Promise<{ mes
   return api.post('/whatsapp/testar', payload)
 }
 
-/** Disparo em massa para os corretores selecionados (respeita opt-in e a fila). */
+export interface DisparoResultado { total: number; whatsapp: number; emails: number; semCanal: number }
+
+/** Disparo em massa (WhatsApp e/ou e-mail) para os corretores selecionados. */
 export async function dispararEmMassa(
   mensagem: string,
   corretorIds: string[],
-): Promise<{ total: number; enfileirados: number; semOptIn: number }> {
-  if (USE_MOCK) return { total: corretorIds.length, enfileirados: corretorIds.length, semOptIn: 0 }
-  return api.post('/whatsapp/broadcast', { mensagem, corretor_ids: corretorIds })
+  canais: { whatsapp: boolean; email: boolean },
+  assunto?: string,
+): Promise<DisparoResultado> {
+  if (USE_MOCK) return { total: corretorIds.length, whatsapp: canais.whatsapp ? corretorIds.length : 0, emails: canais.email ? corretorIds.length : 0, semCanal: 0 }
+  return api.post('/whatsapp/broadcast', { mensagem, corretor_ids: corretorIds, canais, assunto })
 }

@@ -32,6 +32,13 @@ const envSchema = z.object({
   WHATSAPP_MIN_DELAY_MS: z.coerce.number().default(4000),
   WHATSAPP_MAX_DELAY_MS: z.coerce.number().default(9000),
 
+  // E-mail via Microsoft Graph (Outlook) — app-only (client credentials).
+  AZURE_TENANT_ID:     z.string().optional(),
+  AZURE_CLIENT_ID:     z.string().optional(),
+  AZURE_CLIENT_SECRET: z.string().optional(),
+  GRAPH_SENDER_EMAIL:  z.string().optional(),   // mailbox que envia (UPN com permissão Mail.Send)
+  GRAPH_SENDER_NAME:   z.string().default('IDIBRA'),
+
   ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
 })
 
@@ -84,6 +91,16 @@ export const config = {
     // Throttle da fila de envios (ms). O atraso real varia entre min e max (jitter).
     minDelayMs: env.WHATSAPP_MIN_DELAY_MS,
     maxDelayMs: Math.max(env.WHATSAPP_MAX_DELAY_MS, env.WHATSAPP_MIN_DELAY_MS),
+  },
+
+  graph: {
+    // "configurado" = credenciais do Azure + mailbox remetente definidos no .env.
+    enabled: Boolean(env.AZURE_TENANT_ID && env.AZURE_CLIENT_ID && env.AZURE_CLIENT_SECRET && env.GRAPH_SENDER_EMAIL),
+    tenantId:     env.AZURE_TENANT_ID ?? '',
+    clientId:     env.AZURE_CLIENT_ID ?? '',
+    clientSecret: env.AZURE_CLIENT_SECRET ?? '',
+    senderEmail:  env.GRAPH_SENDER_EMAIL ?? '',
+    senderName:   env.GRAPH_SENDER_NAME,
   },
 
   cors: {

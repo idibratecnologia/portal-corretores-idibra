@@ -68,12 +68,15 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
   // Disparo em massa (respeita opt-in e a fila)
   app.post('/broadcast', async (req, reply) => {
-    const { mensagem, corretor_ids } = z.object({
+    const { mensagem, corretor_ids, canais, assunto } = z.object({
       mensagem:     z.string().trim().min(1, 'Mensagem obrigatória'),
       corretor_ids: z.array(z.string().uuid()).min(1, 'Selecione ao menos um corretor'),
-    }).parse(req.body)
-    const r = await broadcast(mensagem, corretor_ids)
-    audit(req, 'enviou', 'broadcast', null, `${r.enfileirados} corretor(es)`, mensagem.slice(0, 120))
+      canais:       z.object({ whatsapp: z.boolean(), email: z.boolean() }).default({ whatsapp: true, email: false }),
+      assunto:      z.string().trim().optional(),
+    }).refine((v) => v.canais.whatsapp || v.canais.email, { message: 'Selecione ao menos um canal', path: ['canais'] })
+      .parse(req.body)
+    const r = await broadcast(mensagem, corretor_ids, { whatsapp: canais.whatsapp, email: canais.email, assunto })
+    audit(req, 'enviou', 'broadcast', null, `WhatsApp ${r.whatsapp} · E-mail ${r.emails}`, mensagem.slice(0, 120))
     return reply.send(r)
   })
 }

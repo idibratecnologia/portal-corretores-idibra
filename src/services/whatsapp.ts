@@ -44,13 +44,20 @@ export async function enviarTesteWhatsapp(payload: TesteWhatsapp): Promise<{ mes
 
 export interface DisparoResultado { total: number; whatsapp: number; emails: number; semCanal: number }
 
-/** Disparo em massa (WhatsApp e/ou e-mail) para os corretores selecionados. */
+/** Disparo em massa (WhatsApp e/ou e-mail) para os corretores selecionados, com anexo opcional. */
 export async function dispararEmMassa(
   mensagem: string,
   corretorIds: string[],
   canais: { whatsapp: boolean; email: boolean },
   assunto?: string,
+  anexo?: File,
 ): Promise<DisparoResultado> {
   if (USE_MOCK) return { total: corretorIds.length, whatsapp: canais.whatsapp ? corretorIds.length : 0, emails: canais.email ? corretorIds.length : 0, semCanal: 0 }
-  return api.post('/whatsapp/broadcast', { mensagem, corretor_ids: corretorIds, canais, assunto })
+  const form = new FormData()
+  form.append('mensagem', mensagem)
+  form.append('corretor_ids', JSON.stringify(corretorIds))
+  form.append('canais', JSON.stringify(canais))
+  if (assunto) form.append('assunto', assunto)
+  if (anexo) form.append('file', anexo)
+  return api.upload<DisparoResultado>('/whatsapp/broadcast', form)
 }

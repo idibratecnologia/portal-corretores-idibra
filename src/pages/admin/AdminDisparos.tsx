@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Send, Search, Loader2, Megaphone, Check, AlertTriangle, MessageCircle, Mail } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Send, Search, Loader2, Megaphone, Check, AlertTriangle, MessageCircle, Mail, Paperclip, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -27,6 +27,9 @@ export function AdminDisparos() {
   const [canalWhats, setCanalWhats] = useState(true)
   const [canalEmail, setCanalEmail] = useState(false)
   const [assunto, setAssunto] = useState('')
+  const [anexo, setAnexo] = useState<File | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const MAX_ANEXO_MB = 10
 
   // filtros
   const [busca, setBusca] = useState('')
@@ -82,6 +85,7 @@ export function AdminDisparos() {
         mensagem.trim(), [...selected],
         { whatsapp: canalWhats, email: canalEmail },
         canalEmail ? (assunto.trim() || undefined) : undefined,
+        anexo ?? undefined,
       )
       const partes: string[] = []
       if (canalWhats) partes.push(`WhatsApp: ${r.whatsapp}`)
@@ -90,13 +94,26 @@ export function AdminDisparos() {
         title: 'Disparo iniciado',
         description: `${partes.join(' · ')}${r.semCanal ? ` · ${r.semCanal} sem canal disponível` : ''}.`,
       })
-      setSelected(new Set()); setMensagem('')
+      setSelected(new Set()); setMensagem(''); setAnexo(null); if (fileRef.current) fileRef.current.value = ''
     } catch (err) {
       toast({ title: 'Erro no disparo', description: getErrorMessage(err), variant: 'destructive' })
     } finally {
       setEnviando(false)
     }
   }
+
+  const onAnexo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    if (f.size > MAX_ANEXO_MB * 1024 * 1024) {
+      toast({ title: 'Anexo muito grande', description: `Máximo ${MAX_ANEXO_MB} MB.`, variant: 'destructive' })
+      e.target.value = ''
+      return
+    }
+    setAnexo(f)
+  }
+  const removerAnexo = () => { setAnexo(null); if (fileRef.current) fileRef.current.value = '' }
+  const anexoGrandeEmail = !!anexo && canalEmail && anexo.size > 3 * 1024 * 1024
 
   const comEmail = selecionados.filter((c) => c.email).length
   const semNenhumCanal = selecionados.filter(
@@ -141,6 +158,25 @@ export function AdminDisparos() {
               </div>
             )}
             {!canalWhats && !canalEmail && <p className="text-[11px] text-amber-600">Selecione ao menos um canal.</p>}
+
+            {/* Anexo */}
+            <div className="pt-2 border-t border-gray-100">
+              <input ref={fileRef} type="file" className="hidden" onChange={onAnexo} accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" />
+              {anexo ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <Paperclip className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <span className="flex-1 min-w-0 truncate text-gray-700">{anexo.name}</span>
+                  <span className="text-[11px] text-gray-400">{(anexo.size / 1024 / 1024).toFixed(1)} MB</span>
+                  <button onClick={removerAnexo} className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><X className="w-4 h-4" /></button>
+                </div>
+              ) : (
+                <button onClick={() => fileRef.current?.click()} className="text-sm text-gray-600 hover:text-green-700 inline-flex items-center gap-1.5">
+                  <Paperclip className="w-4 h-4" /> Anexar arquivo (opcional)
+                </button>
+              )}
+              {anexoGrandeEmail && <p className="text-[11px] text-amber-600 mt-1">Anexo &gt; 3 MB pode falhar no e-mail (limite do Outlook). No WhatsApp vai normalmente.</p>}
+              {anexo && <p className="text-[10px] text-gray-400 mt-1">No WhatsApp, imagens vão como foto e os demais como documento; a mensagem vira a legenda.</p>}
+            </div>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">

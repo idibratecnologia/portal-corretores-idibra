@@ -68,7 +68,10 @@ export async function enviarTesteTexto(numero: string, texto: string): Promise<v
 export async function broadcast(
   mensagem: string,
   corretorIds: string[],
-  opts: { whatsapp: boolean; email: boolean; assunto?: string } = { whatsapp: true, email: false },
+  opts: {
+    whatsapp: boolean; email: boolean; assunto?: string
+    anexo?: { base64: string; fileName: string; mimeType: string }
+  } = { whatsapp: true, email: false },
 ): Promise<{ total: number; whatsapp: number; emails: number; semCanal: number }> {
   const corretores = await prisma.corretor.findMany({
     where:  { id: { in: corretorIds } },
@@ -91,6 +94,7 @@ export async function broadcast(
       mensagem:   mensagem.replace(/\{nome\}/g, c.nome.split(' ')[0]),
       canais:     { whatsapp: opts.whatsapp, email: opts.email },
       assunto:    opts.assunto,
+      anexo:      opts.anexo,
     })
     if (podeWhats) whatsappCount++
     if (podeEmail) emailsCount++

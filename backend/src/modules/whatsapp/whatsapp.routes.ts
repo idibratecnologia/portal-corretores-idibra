@@ -13,6 +13,7 @@ import { whatsappQueueSize } from '@/lib/whatsapp-queue'
 import { enviarTesteEvento, enviarTesteTexto, broadcast } from './whatsapp.service'
 import { authenticate, requireAdmin } from '@/middlewares/auth.middleware'
 import { audit } from '@/lib/audit'
+import { BadRequestError } from '@/lib/errors'
 
 const testeSchema = z.object({
   numero:     z.string().min(8, 'Número inválido'),
@@ -68,15 +69,38 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
   // Disparo em massa (respeita opt-in e a fila)
   app.post('/broadcast', async (req, reply) => {
+    // Aceita JSON (sem anexo) ou multipart/form-data (com anexo opcional)
+    let raw: { mensagem?: string; corretor_ids?: unknown; canais?: unknown; assunto?: string } = {}
+    let anexo: { base64: string; fileName: string; mimeType: string } | undefined
+
+    if (req.isMultipart()) {
+      for await (const part of req.parts({ limits: { fileSize: config.upload.maxSizeMB * 1024 * 1024 } })) {
+        if (part.type === 'file') {
+          const buf = await part.toBuffer()
+          if ((part.file as { truncated?: boolean }).truncated) throw new BadRequestError(`Anexo muito grande. Máximo ${config.upload.maxSizeMB} MB.`)
+          if (buf.length > 0) anexo = { base64: buf.toString('base64'), fileName: part.filename || 'anexo', mimeType: part.mimetype || 'application/octet-stream' }
+        } else {
+          const v = part.value as string
+          if (part.fieldname === 'mensagem') raw.mensagem = v
+          else if (part.fieldname === 'corretor_ids') raw.corretor_ids = JSON.parse(v)
+          else if (part.fieldname === 'canais') raw.canais = JSON.parse(v)
+          else if (part.fieldname === 'assunto') raw.assunto = v
+        }
+      }
+    } else {
+      raw = req.body as typeof raw
+    }
+
     const { mensagem, corretor_ids, canais, assunto } = z.object({
       mensagem:     z.string().trim().min(1, 'Mensagem obrigatória'),
       corretor_ids: z.array(z.string().uuid()).min(1, 'Selecione ao menos um corretor'),
       canais:       z.object({ whatsapp: z.boolean(), email: z.boolean() }).default({ whatsapp: true, email: false }),
       assunto:      z.string().trim().optional(),
     }).refine((v) => v.canais.whatsapp || v.canais.email, { message: 'Selecione ao menos um canal', path: ['canais'] })
-      .parse(req.body)
-    const r = await broadcast(mensagem, corretor_ids, { whatsapp: canais.whatsapp, email: canais.email, assunto })
-    audit(req, 'enviou', 'broadcast', null, `WhatsApp ${r.whatsapp} · E-mail ${r.emails}`, mensagem.slice(0, 120))
+      .parse(raw)
+
+    const r = await broadcast(mensagem, corretor_ids, { whatsapp: canais.whatsapp, email: canais.email, assunto, anexo })
+    audit(req, 'enviou', 'broadcast', null, `WhatsApp ${r.whatsapp} · E-mail ${r.emails}${anexo ? ' · com anexo' : ''}`, mensagem.slice(0, 120))
     return reply.send(r)
   })
 }

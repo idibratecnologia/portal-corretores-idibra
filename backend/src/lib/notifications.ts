@@ -69,6 +69,7 @@ interface NotifyParams {
   imagemBase64?: string   // imagem já em base64 (ex.: QR gerado) — enviada direto
   canais?:       Canais   // padrão: WhatsApp + e-mail
   assunto?:      string   // assunto do e-mail (sobrescreve o padrão do tipo)
+  anexo?:        { base64: string; fileName: string; mimeType: string }  // anexo (e-mail) / documento ou imagem (WhatsApp)
 }
 
 /**
@@ -76,19 +77,22 @@ interface NotifyParams {
  * Respeita o opt-in do corretor (LGPD): se não consentiu, não envia.
  */
 export async function notify(params: NotifyParams): Promise<void> {
-  const { corretorId, eventoId, tipo, whatsapp, optIn, mensagem, imagemUrl, imagemBase64, canais, assunto } = params
+  const { corretorId, eventoId, tipo, whatsapp, optIn, mensagem, imagemUrl, imagemBase64, canais, assunto, anexo } = params
 
   // E-mail: canal independente (não usa o opt-in de WhatsApp). Best-effort.
-  if (canais?.email !== false) enviarEmailNotificacao(corretorId, tipo, mensagem, undefined, assunto)
+  if (canais?.email !== false) {
+    const emailAnexos = anexo ? [{ name: anexo.fileName, contentBytes: anexo.base64, contentType: anexo.mimeType }] : undefined
+    enviarEmailNotificacao(corretorId, tipo, mensagem, emailAnexos, assunto)
+  }
 
   // WhatsApp: respeita o opt-in (LGPD) e a seleção de canal
   if (canais?.whatsapp === false || !optIn) return
 
-  const temImagem = Boolean(imagemUrl || imagemBase64)
+  const temAnexo = Boolean(anexo || imagemUrl || imagemBase64)
 
   // Sem Evolution (dev/test): stub síncrono — loga e registra como enviado.
   if (!config.evolution.enabled) {
-    console.log(`[notify:stub] (${tipo}) → ${whatsapp}${temImagem ? ' [com imagem]' : ''}\n${mensagem}\n`)
+    console.log(`[notify:stub] (${tipo}) → ${whatsapp}${temAnexo ? ' [com anexo]' : ''}\n${mensagem}\n`)
     await prisma.notificacaoLog.create({
       data: { corretor_id: corretorId, evento_id: eventoId, tipo, status: 'enviado', mensagem },
     })
@@ -99,7 +103,14 @@ export async function notify(params: NotifyParams): Promise<void> {
   // o job efetivamente roda, refletindo o resultado real do envio.
   enqueueWhatsApp(async () => {
     try {
-      await sendWhatsApp(whatsapp, mensagem, imagemUrl, imagemBase64)
+      if (anexo) {
+        const digitos = whatsapp.replace(/\D/g, '')
+        const numero = digitos.startsWith('55') ? digitos : `55${digitos}`
+        if (anexo.mimeType.startsWith('image/')) await sendMedia(numero, anexo.base64, mensagem)
+        else await sendDocument(numero, anexo.base64, anexo.fileName, mensagem)
+      } else {
+        await sendWhatsApp(whatsapp, mensagem, imagemUrl, imagemBase64)
+      }
       await prisma.notificacaoLog.create({
         data: { corretor_id: corretorId, evento_id: eventoId, tipo, status: 'enviado', mensagem },
       })

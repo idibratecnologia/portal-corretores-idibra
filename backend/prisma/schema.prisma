@@ -99,7 +99,8 @@ model Corretor {
   senha_provisoria  Boolean        @default(false)  // true = precisa trocar no 1º acesso (ex.: importados com CPF)
   telefone          String
   whatsapp          String
-  whatsapp_opt_in   Boolean        @default(false)   // LGPD: consentiu receber notificações
+  whatsapp_opt_in   Boolean        @default(false)   // LGPD: consentiu receber notificações (WhatsApp)
+  email_opt_in      Boolean        @default(true)    // LGPD: receber e-mails de marketing (descadastrável)
   instagram         String?
   data_nascimento   DateTime?      // Aniversário do corretor
   cidade            String
@@ -218,6 +219,7 @@ model NotificacaoLog {
   //          aprovacao | checkin | cancelamento_evento
   tipo        String
 
+  canal       String    @default("whatsapp")  // whatsapp | email
   status      String    // enviado | erro
   mensagem    String?   // Texto enviado (auditoria e reenvio)
   erro        String?   // Mensagem de erro se o disparo falhou
@@ -231,6 +233,8 @@ model NotificacaoLog {
 
   @@index([corretor_id])
   @@index([tipo, status])
+  @@index([canal])
+  @@index([enviado_at])
   @@map("notificacoes_log")
 }
 
@@ -433,6 +437,41 @@ model DocumentoVisualGerado {
   @@index([evento_id])
   @@index([corretor_id])
   @@map("documentos_visuais_gerados")
+}
+
+// Modelos de mensagem salvos (reuso no Disparo em massa).
+model ModeloMensagem {
+  id         String   @id @default(uuid())
+  nome       String
+  assunto    String?  // assunto sugerido para e-mail
+  conteudo   String   // texto da mensagem (aceita {nome})
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("modelos_mensagem")
+}
+
+// Disparo em massa agendado para uma data/hora futura (executado por cron).
+model DisparoAgendado {
+  id             String    @id @default(uuid())
+  mensagem       String
+  assunto        String?
+  canal_whatsapp Boolean   @default(true)
+  canal_email    Boolean   @default(false)
+  corretor_ids   String[]
+  anexo_base64   String?   // anexo opcional embutido (base64)
+  anexo_nome     String?
+  anexo_mime     String?
+  agendado_para  DateTime
+  status         String    @default("pendente") // pendente | enviado | erro | cancelado
+  resultado      String?   // resumo do envio (ex.: "WhatsApp 12 · E-mail 8")
+  erro           String?
+  enviado_at     DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  @@index([status, agendado_para])
+  @@map("disparos_agendados")
 }
 
 // ─── Log de Auditoria (ações dos administradores) ────────────────

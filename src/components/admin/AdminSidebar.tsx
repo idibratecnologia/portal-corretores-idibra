@@ -16,6 +16,8 @@ import {
   UserCheck,
   GraduationCap,
   Palette,
+  Inbox,
+  Cake,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -46,6 +48,8 @@ const navGroups = [
       { to: '/admin/relatorios', icon: BarChart3, label: 'Relatórios' },
       { to: '/admin/notificacoes', icon: Bell, label: 'Notificações' },
       { to: '/admin/disparos', icon: Megaphone, label: 'Disparos' },
+      { to: '/admin/comunicacoes', icon: Inbox, label: 'Comunicações' },
+      { to: '/admin/aniversariantes', icon: Cake, label: 'Aniversariantes' },
       { to: '/admin/usuarios', icon: ShieldCheck, label: 'Usuários', superOnly: true },
       { to: '/admin/logs', icon: ScrollText, label: 'Logs', superOnly: true },
       { to: '/admin/configuracoes', icon: Settings, label: 'Configurações' },

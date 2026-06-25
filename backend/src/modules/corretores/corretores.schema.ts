@@ -25,6 +25,7 @@ export const createCorretorSchema = z.object({
   telefone:       z.string().optional(),   // legado — preenchido a partir do WhatsApp
   whatsapp:       z.string().min(14, 'WhatsApp inválido'),
   whatsapp_opt_in: z.boolean().optional(),
+  email_opt_in:   z.boolean().optional(),
   instagram:      z.string().optional(),
   data_nascimento: z.coerce.date().optional().nullable()
                      .transform((d) => d ? new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0)) : d),

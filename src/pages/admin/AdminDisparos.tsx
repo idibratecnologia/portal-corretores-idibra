@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { Send, Search, Loader2, Megaphone, Check, AlertTriangle, MessageCircle, Mail, Paperclip, X } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { Send, Search, Loader2, Megaphone, Check, AlertTriangle, MessageCircle, Mail, Paperclip, X, CalendarClock, Trash2, Clock } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -12,6 +12,9 @@ import { getErrorMessage } from '@/lib/errors'
 import { fetchCorretores } from '@/services/corretores'
 import { fetchImobiliarias } from '@/services/imobiliarias'
 import { dispararEmMassa } from '@/services/whatsapp'
+import { agendarDisparo, fetchDisparosAgendados, cancelarDisparoAgendado, type DisparoAgendado } from '@/services/disparosAgendados'
+import { ModelosMensagemBar } from '@/components/admin/ModelosMensagemBar'
+import { formatDateTime } from '@/lib/utils'
 import type { Corretor, Imobiliaria } from '@/types'
 
 export function AdminDisparos() {
@@ -30,6 +33,10 @@ export function AdminDisparos() {
   const [anexo, setAnexo] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const MAX_ANEXO_MB = 10
+  // Agendamento
+  const [agendar, setAgendar] = useState(false)
+  const [agendarPara, setAgendarPara] = useState('')
+  const [agendados, setAgendados] = useState<DisparoAgendado[]>([])
 
   // filtros
   const [busca, setBusca] = useState('')
@@ -44,6 +51,11 @@ export function AdminDisparos() {
       .catch((err) => toast({ title: 'Erro ao carregar corretores', description: getErrorMessage(err), variant: 'destructive' }))
       .finally(() => setLoading(false))
   }, [toast])
+
+  const carregarAgendados = useCallback(() => {
+    fetchDisparosAgendados().then(setAgendados).catch(() => {})
+  }, [])
+  useEffect(() => { carregarAgendados() }, [carregarAgendados])
 
   const cidades = useMemo(
     () => [...new Set(corretores.map((c) => c.cidade).filter(Boolean))].sort(),
@@ -77,28 +89,45 @@ export function AdminDisparos() {
       return n
     })
 
+  const resetForm = () => {
+    setSelected(new Set()); setMensagem(''); setAnexo(null)
+    setAgendar(false); setAgendarPara('')
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
   const handleEnviar = async () => {
     setConfirmar(false)
     setEnviando(true)
     try {
-      const r = await dispararEmMassa(
-        mensagem.trim(), [...selected],
-        { whatsapp: canalWhats, email: canalEmail },
-        canalEmail ? (assunto.trim() || undefined) : undefined,
-        anexo ?? undefined,
-      )
-      const partes: string[] = []
-      if (canalWhats) partes.push(`WhatsApp: ${r.whatsapp}`)
-      if (canalEmail) partes.push(`E-mail: ${r.emails}`)
-      toast({
-        title: 'Disparo iniciado',
-        description: `${partes.join(' · ')}${r.semCanal ? ` · ${r.semCanal} sem canal disponível` : ''}.`,
-      })
-      setSelected(new Set()); setMensagem(''); setAnexo(null); if (fileRef.current) fileRef.current.value = ''
+      const canais = { whatsapp: canalWhats, email: canalEmail }
+      const assuntoFinal = canalEmail ? (assunto.trim() || undefined) : undefined
+
+      if (agendar) {
+        const iso = new Date(agendarPara).toISOString()
+        const d = await agendarDisparo(mensagem.trim(), [...selected], canais, iso, assuntoFinal, anexo ?? undefined)
+        toast({ title: 'Disparo agendado', description: `Para ${formatDateTime(d.agendado_para)} · ${d.total_corretores} corretor(es).` })
+        carregarAgendados()
+      } else {
+        const r = await dispararEmMassa(mensagem.trim(), [...selected], canais, assuntoFinal, anexo ?? undefined)
+        const partes: string[] = []
+        if (canalWhats) partes.push(`WhatsApp: ${r.whatsapp}`)
+        if (canalEmail) partes.push(`E-mail: ${r.emails}`)
+        toast({ title: 'Disparo iniciado', description: `${partes.join(' · ')}${r.semCanal ? ` · ${r.semCanal} sem canal disponível` : ''}.` })
+      }
+      resetForm()
     } catch (err) {
-      toast({ title: 'Erro no disparo', description: getErrorMessage(err), variant: 'destructive' })
+      toast({ title: agendar ? 'Erro ao agendar' : 'Erro no disparo', description: getErrorMessage(err), variant: 'destructive' })
     } finally {
       setEnviando(false)
+    }
+  }
+
+  const cancelarAgendado = async (id: string) => {
+    try {
+      await cancelarDisparoAgendado(id)
+      setAgendados((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'cancelado' } : d)))
+    } catch (err) {
+      toast({ title: 'Erro ao cancelar', description: getErrorMessage(err), variant: 'destructive' })
     }
   }
 
@@ -119,7 +148,10 @@ export function AdminDisparos() {
   const semNenhumCanal = selecionados.filter(
     (c) => !((canalWhats && c.whatsapp_opt_in && c.whatsapp) || (canalEmail && c.email)),
   ).length
-  const podeEnviar = mensagem.trim().length > 0 && selected.size > 0 && (canalWhats || canalEmail)
+  const agendamentoValido = !agendar || (!!agendarPara && new Date(agendarPara).getTime() > Date.now())
+  const podeEnviar = mensagem.trim().length > 0 && selected.size > 0 && (canalWhats || canalEmail) && agendamentoValido
+  // valor mínimo do input (agora, formato datetime-local)
+  const minDateTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 
   return (
     <div className="space-y-6">
@@ -138,6 +170,14 @@ export function AdminDisparos() {
               <p className="text-xs text-gray-400">Use <code className="bg-gray-100 px-1 rounded">{'{nome}'}</code> para inserir o primeiro nome do corretor.</p>
               <span className="text-[11px] text-gray-400">{mensagem.length} caracteres</span>
             </div>
+            <ModelosMensagemBar
+              mensagem={mensagem}
+              assunto={canalEmail ? assunto : undefined}
+              onApply={(conteudo, assuntoModelo) => {
+                setMensagem(conteudo)
+                if (assuntoModelo) { setAssunto(assuntoModelo); setCanalEmail(true) }
+              }}
+            />
           </div>
 
           {/* Canais */}
@@ -204,8 +244,25 @@ export function AdminDisparos() {
             {selected.size > 0 && semNenhumCanal > 0 && (
               <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> {semNenhumCanal} selecionado(s) não receberão por nenhum canal escolhido.</p>
             )}
+
+            {/* Agendamento */}
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={agendar} onChange={(e) => setAgendar(e.target.checked)} className="rounded border-gray-300 accent-green-600" />
+                <CalendarClock className="w-4 h-4 text-green-600" /> Agendar para depois
+              </label>
+              {agendar && (
+                <>
+                  <Input type="datetime-local" value={agendarPara} min={minDateTime} onChange={(e) => setAgendarPara(e.target.value)} className="mt-2" />
+                  {agendarPara && !agendamentoValido && <p className="text-[11px] text-amber-600 mt-1">Escolha uma data/hora futura.</p>}
+                  <p className="text-[10px] text-gray-400 mt-1">O envio acontece automaticamente no horário marcado (fuso de Brasília).</p>
+                </>
+              )}
+            </div>
+
             <Button onClick={() => setConfirmar(true)} disabled={!podeEnviar || enviando} className="w-full mt-4 bg-green-700 hover:bg-green-800 gap-2">
-              {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Enviar disparo
+              {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : agendar ? <CalendarClock className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+              {agendar ? 'Agendar disparo' : 'Enviar disparo'}
             </Button>
           </div>
         </div>
@@ -264,12 +321,48 @@ export function AdminDisparos() {
         </div>
       </div>
 
+      {/* Disparos agendados */}
+      {agendados.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+            <CalendarClock className="w-4 h-4 text-green-600" />
+            <h2 className="text-sm font-semibold text-gray-800">Disparos agendados</h2>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {agendados.map((d) => (
+              <div key={d.id} className="flex items-start gap-3 px-5 py-3">
+                <Clock className="w-4 h-4 text-gray-300 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-gray-800">{formatDateTime(d.agendado_para)}</span>
+                    <StatusBadge status={d.status} />
+                    <span className="text-[11px] text-gray-400">
+                      {[d.canal_whatsapp && 'WhatsApp', d.canal_email && 'E-mail'].filter(Boolean).join(' + ')} · {d.total_corretores} corretor(es){d.tem_anexo ? ' · anexo' : ''}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{d.mensagem}</p>
+                  {d.resultado && <p className="text-[11px] text-green-600 mt-0.5">{d.resultado}</p>}
+                  {d.erro && <p className="text-[11px] text-red-500 mt-0.5">{d.erro}</p>}
+                </div>
+                {d.status === 'pendente' && (
+                  <button onClick={() => cancelarAgendado(d.id)} title="Cancelar agendamento" className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg flex-shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <AlertDialog open={confirmar} onOpenChange={setConfirmar}>
         <AlertDialogContent className="rounded-2xl max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar disparo?</AlertDialogTitle>
+            <AlertDialogTitle>{agendar ? 'Confirmar agendamento?' : 'Confirmar disparo?'}</AlertDialogTitle>
             <AlertDialogDescription>
-              A mensagem será enviada {canalWhats && <>por <strong>WhatsApp</strong> a <strong>{comOptIn}</strong> (opt-in)</>}
+              {agendar && <>Será agendada para <strong>{agendarPara ? formatDateTime(new Date(agendarPara).toISOString()) : '—'}</strong>: a mensagem </>}
+              {!agendar && 'A mensagem '}
+              será enviada {canalWhats && <>por <strong>WhatsApp</strong> a <strong>{comOptIn}</strong> (opt-in)</>}
               {canalWhats && canalEmail && ' e '}
               {canalEmail && <>por <strong>e-mail</strong> a <strong>{comEmail}</strong></>}
               {' '}corretor(es).{semNenhumCanal > 0 && ` ${semNenhumCanal} sem canal disponível serão ignorados.`} O envio respeita a fila.
@@ -277,10 +370,23 @@ export function AdminDisparos() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleEnviar} className="rounded-xl bg-green-700 hover:bg-green-800">Sim, enviar</AlertDialogAction>
+            <AlertDialogAction onClick={handleEnviar} className="rounded-xl bg-green-700 hover:bg-green-800">{agendar ? 'Sim, agendar' : 'Sim, enviar'}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   )
+}
+
+const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
+  pendente:     { label: 'Agendado',    cls: 'bg-amber-100 text-amber-700' },
+  processando:  { label: 'Enviando…',   cls: 'bg-blue-100 text-blue-700' },
+  enviado:      { label: 'Enviado',     cls: 'bg-green-100 text-green-700' },
+  erro:         { label: 'Erro',        cls: 'bg-red-100 text-red-600' },
+  cancelado:    { label: 'Cancelado',   cls: 'bg-gray-100 text-gray-500' },
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_STYLE[status] ?? { label: status, cls: 'bg-gray-100 text-gray-500' }
+  return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
 }

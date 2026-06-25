@@ -161,3 +161,9 @@ export async function atualizarMeuOptIn(opt_in: boolean): Promise<void> {
 
   await api.patch('/corretores/me/opt-in', { whatsapp_opt_in: opt_in })
 }
+
+/** Corretor logado altera o próprio consentimento de e-mail (LGPD) */
+export async function atualizarMeuEmailOptIn(opt_in: boolean): Promise<void> {
+  if (USE_MOCK) { console.log('[mock] atualizarMeuEmailOptIn', opt_in); return }
+  await api.patch('/corretores/me', { email_opt_in: opt_in })
+}

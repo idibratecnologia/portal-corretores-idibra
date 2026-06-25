@@ -75,7 +75,7 @@ export async function broadcast(
 ): Promise<{ total: number; whatsapp: number; emails: number; semCanal: number }> {
   const corretores = await prisma.corretor.findMany({
     where:  { id: { in: corretorIds } },
-    select: { id: true, nome: true, whatsapp: true, whatsapp_opt_in: true, email: true },
+    select: { id: true, nome: true, whatsapp: true, whatsapp_opt_in: true, email: true, email_opt_in: true },
   })
 
   let whatsappCount = 0
@@ -83,7 +83,7 @@ export async function broadcast(
   let semCanal = 0
   for (const c of corretores) {
     const podeWhats = opts.whatsapp && !!c.whatsapp_opt_in && !!c.whatsapp
-    const podeEmail = opts.email && !!c.email
+    const podeEmail = opts.email && !!c.email && c.email_opt_in
     if (!podeWhats && !podeEmail) { semCanal++; continue }
 
     await notify({

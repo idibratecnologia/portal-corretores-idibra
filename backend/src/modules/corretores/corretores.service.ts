@@ -26,6 +26,7 @@ const corretorSelect = {
   telefone:        true,
   whatsapp:        true,
   whatsapp_opt_in: true,
+  email_opt_in:    true,
   senha_provisoria: true,
   instagram:       true,
   data_nascimento: true,

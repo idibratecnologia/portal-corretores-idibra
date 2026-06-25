@@ -16,8 +16,11 @@ function textoParaHtml(texto: string): string {
 }
 
 /** Envelopa o conteúdo num layout de e-mail responsivo e simples. */
-export function montarHtmlEmail(mensagem: string): string {
+export function montarHtmlEmail(mensagem: string, opts?: { descadastroUrl?: string }): string {
   const corpo = textoParaHtml(mensagem)
+  const rodapeDescadastro = opts?.descadastroUrl
+    ? `<br><a href="${opts.descadastroUrl}" style="color:#9ca3af;text-decoration:underline">Não quero mais receber estes e-mails</a>`
+    : ''
   return `<!doctype html><html><body style="margin:0;background:#f1f5f9;padding:24px 0;font-family:Arial,Helvetica,sans-serif;color:#374151">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
     <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb">
@@ -27,7 +30,7 @@ export function montarHtmlEmail(mensagem: string): string {
       </td></tr>
       <tr><td style="padding:28px;font-size:15px;line-height:1.6">${corpo}</td></tr>
       <tr><td style="padding:16px 28px;border-top:1px solid #f1f5f9;color:#9ca3af;font-size:12px">
-        Esta é uma mensagem automática do Portal de Corretores IDIBRA.
+        Esta é uma mensagem automática do Portal de Corretores IDIBRA.${rodapeDescadastro}
       </td></tr>
     </table>
     <p style="color:#9ca3af;font-size:11px;margin:16px 0 0">© ${new Date().getFullYear()} IDIBRA — corretoridibra.com.br</p>

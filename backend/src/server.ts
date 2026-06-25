@@ -33,11 +33,17 @@ import { materiaisRoutes } from '@/modules/materiais/materiais.routes'
 import { treinamentosRoutes } from '@/modules/treinamentos/treinamentos.routes'
 import { modelosRoutes } from '@/modules/modelos/modelos.routes'
 import { logsRoutes } from '@/modules/auditoria/auditoria.routes'
+import { comunicacoesRoutes } from '@/modules/comunicacoes/comunicacoes.routes'
+import { modelosMensagemRoutes } from '@/modules/modelos-mensagem/modelos-mensagem.routes'
+import { disparosAgendadosRoutes } from '@/modules/disparos-agendados/disparos-agendados.routes'
+import { aniversariantesRoutes } from '@/modules/aniversariantes/aniversariantes.routes'
 import { publicoRoutes } from '@/modules/publico/publico.routes'
 import { seedTemplates } from '@/modules/templates/templates.service'
 import { agendarLembretes } from '@/jobs/lembretes'
 import { agendarLimpezaVideos } from '@/jobs/videos'
 import { agendarCertificadosAutomaticos } from '@/jobs/certificados'
+import { agendarDisparosAgendados } from '@/jobs/disparos-agendados'
+import { agendarAniversariantes } from '@/jobs/aniversariantes'
 import { recuperarFilaPendente } from '@/lib/video-queue'
 
 async function buildServer() {
@@ -165,6 +171,10 @@ async function buildServer() {
   await app.register(treinamentosRoutes)
   await app.register(modelosRoutes)
   await app.register(logsRoutes,         { prefix: '/logs' })
+  await app.register(comunicacoesRoutes, { prefix: '/comunicacoes' })
+  await app.register(modelosMensagemRoutes, { prefix: '/modelos-mensagem' })
+  await app.register(disparosAgendadosRoutes, { prefix: '/disparos-agendados' })
+  await app.register(aniversariantesRoutes, { prefix: '/aniversariantes' })
   await app.register(publicoRoutes,      { prefix: '/public' })
 
   return app
@@ -192,6 +202,8 @@ async function start() {
       agendarLembretes()
       agendarLimpezaVideos()
       agendarCertificadosAutomaticos()
+      agendarDisparosAgendados()
+      agendarAniversariantes()
       recuperarFilaPendente().catch((e) => app.log.error(e)) // reprocessa vídeos pendentes após restart
     }
   } catch (err) {

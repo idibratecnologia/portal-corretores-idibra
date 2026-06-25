@@ -116,6 +116,19 @@ Olá, {{nome}}! Sua presença no evento *{{evento}}* foi registrada.
 Obrigado pela participação! 🏆`,
   },
   {
+    tipo: 'aniversario',
+    titulo: 'Aniversário do corretor',
+    descricao: 'Enviado automaticamente no dia do aniversário do corretor.',
+    com_imagem: false,
+    placeholders: ['nome'],
+    conteudo:
+`🎂 *Feliz aniversário, {{nome}}!* 🎉
+
+Toda a equipe IDIBRA deseja a você um dia incrível, cheio de alegria e realizações!
+
+Conte sempre com a gente. 🥳🏠`,
+  },
+  {
     tipo: 'cancelamento_evento',
     titulo: 'Evento cancelado',
     descricao: 'Enviado aos inscritos quando um evento é cancelado.',

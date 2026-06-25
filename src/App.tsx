@@ -41,6 +41,7 @@ const EsqueciSenhaPage = lazyNamed(() => import('@/pages/EsqueciSenhaPage'), 'Es
 const ResetarSenhaPage = lazyNamed(() => import('@/pages/ResetarSenhaPage'), 'ResetarSenhaPage')
 const PublicEventoPage = lazyNamed(() => import('@/pages/PublicEventoPage'), 'PublicEventoPage')
 const ValidarCertificadoPage = lazyNamed(() => import('@/pages/ValidarCertificadoPage'), 'ValidarCertificadoPage')
+const DescadastrarEmail = lazyNamed(() => import('@/pages/DescadastrarEmail'), 'DescadastrarEmail')
 
 // Admin pages
 const AdminDashboard = lazyNamed(() => import('@/pages/admin/AdminDashboard'), 'AdminDashboard')
@@ -55,6 +56,8 @@ const AdminNotificacoes = lazyNamed(() => import('@/pages/admin/AdminNotificacoe
 const AdminUsuarios = lazyNamed(() => import('@/pages/admin/AdminUsuarios'), 'AdminUsuarios')
 const AdminLogs = lazyNamed(() => import('@/pages/admin/AdminLogs'), 'AdminLogs')
 const AdminDisparos = lazyNamed(() => import('@/pages/admin/AdminDisparos'), 'AdminDisparos')
+const AdminComunicacoes = lazyNamed(() => import('@/pages/admin/AdminComunicacoes'), 'AdminComunicacoes')
+const AdminAniversariantes = lazyNamed(() => import('@/pages/admin/AdminAniversariantes'), 'AdminAniversariantes')
 const AdminCheckinKiosk = lazyNamed(() => import('@/pages/admin/AdminCheckinKiosk'), 'AdminCheckinKiosk')
 const AdminCredenciamento = lazyNamed(() => import('@/pages/admin/AdminCredenciamento'), 'AdminCredenciamento')
 const AdminAprovacoes = lazyNamed(() => import('@/pages/admin/AdminAprovacoes'), 'AdminAprovacoes')
@@ -112,6 +115,7 @@ function AppRoutes() {
       <Route path="/resetar-senha" element={<ResetarSenhaPage />} />
       <Route path="/evento/:id" element={<PublicEventoPage />} />
       <Route path="/validar/:codigo" element={<ValidarCertificadoPage />} />
+      <Route path="/descadastrar" element={<DescadastrarEmail />} />
 
       {/* Redireciona variações de login para a raiz (consolida o canônico) */}
       <Route path="/login" element={<Navigate to="/" replace />} />
@@ -135,6 +139,8 @@ function AppRoutes() {
         <Route path="relatorios" element={<AdminRelatorios />} />
         <Route path="notificacoes" element={<AdminNotificacoes />} />
         <Route path="disparos" element={<AdminDisparos />} />
+        <Route path="comunicacoes" element={<AdminComunicacoes />} />
+        <Route path="aniversariantes" element={<AdminAniversariantes />} />
         <Route path="usuarios" element={<SuperRoute><AdminUsuarios /></SuperRoute>} />
         <Route path="logs" element={<SuperRoute><AdminLogs /></SuperRoute>} />
         <Route path="configuracoes" element={<AdminConfiguracoes />} />

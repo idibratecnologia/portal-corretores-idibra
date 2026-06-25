@@ -15,6 +15,11 @@ import { enqueueWhatsApp } from '@/lib/whatsapp-queue'
 import { emailEnabled, sendEmail, type EmailAttachment } from '@/lib/email-graph'
 import { montarHtmlEmail } from '@/lib/email-template'
 import { enqueueEmail } from '@/lib/email-queue'
+import { urlDescadastro } from '@/lib/descadastro'
+
+// Tipos de "marketing" respeitam o opt-in de e-mail (descadastrável). Os demais
+// são transacionais (inscrição, certificado, reset…) e sempre são enviados.
+const TIPOS_MARKETING = new Set<NotificacaoTipo>(['evento_novo', 'broadcast', 'aniversario'])
 
 export type NotificacaoTipo =
   | 'inscricao_confirmada'
@@ -26,6 +31,7 @@ export type NotificacaoTipo =
   | 'evento_novo'
   | 'certificado'
   | 'broadcast'
+  | 'aniversario'
 
 const ASSUNTO_EMAIL: Record<NotificacaoTipo, string> = {
   inscricao_confirmada:  'Inscrição confirmada — IDIBRA',
@@ -37,6 +43,7 @@ const ASSUNTO_EMAIL: Record<NotificacaoTipo, string> = {
   evento_novo:           'Novo evento — IDIBRA',
   certificado:           'Seu certificado de participação — IDIBRA',
   broadcast:             'IDIBRA — Comunicado',
+  aniversario:           'Feliz aniversário! 🎉 — IDIBRA',
 }
 
 /**
@@ -44,14 +51,28 @@ const ASSUNTO_EMAIL: Record<NotificacaoTipo, string> = {
  * Best-effort: não bloqueia nem derruba o fluxo se falhar/estiver desativado.
  */
 function enviarEmailNotificacao(
-  corretorId: string, tipo: NotificacaoTipo, mensagem: string, attachments?: EmailAttachment[], assunto?: string,
+  corretorId: string, tipo: NotificacaoTipo, mensagem: string, attachments?: EmailAttachment[], assunto?: string, eventoId?: string,
 ): void {
   if (!emailEnabled()) return
+  const marketing = TIPOS_MARKETING.has(tipo)
   enqueueEmail(async () => {
-    const corretor = await prisma.corretor.findUnique({ where: { id: corretorId }, select: { email: true } })
+    const corretor = await prisma.corretor.findUnique({ where: { id: corretorId }, select: { email: true, email_opt_in: true } })
     if (!corretor?.email) return
-    await sendEmail({ to: corretor.email, subject: assunto || ASSUNTO_EMAIL[tipo], html: montarHtmlEmail(mensagem), attachments })
-    console.log(`[email] (${tipo}) → ${corretor.email}`)
+    // LGPD: e-mails de marketing só vão para quem está com opt-in ativo
+    if (marketing && !corretor.email_opt_in) return
+    const html = montarHtmlEmail(mensagem, marketing ? { descadastroUrl: urlDescadastro(corretorId) } : undefined)
+    try {
+      await sendEmail({ to: corretor.email, subject: assunto || ASSUNTO_EMAIL[tipo], html, attachments })
+      await prisma.notificacaoLog.create({
+        data: { corretor_id: corretorId, evento_id: eventoId, tipo, canal: 'email', status: 'enviado', mensagem },
+      })
+      console.log(`[email] (${tipo}) → ${corretor.email}`)
+    } catch (err) {
+      await prisma.notificacaoLog.create({
+        data: { corretor_id: corretorId, evento_id: eventoId, tipo, canal: 'email', status: 'erro', mensagem, erro: err instanceof Error ? err.message : String(err) },
+      })
+      console.error(`[email] falha (${tipo}) → ${corretor.email}:`, err instanceof Error ? err.message : err)
+    }
   })
 }
 
@@ -82,7 +103,7 @@ export async function notify(params: NotifyParams): Promise<void> {
   // E-mail: canal independente (não usa o opt-in de WhatsApp). Best-effort.
   if (canais?.email !== false) {
     const emailAnexos = anexo ? [{ name: anexo.fileName, contentBytes: anexo.base64, contentType: anexo.mimeType }] : undefined
-    enviarEmailNotificacao(corretorId, tipo, mensagem, emailAnexos, assunto)
+    enviarEmailNotificacao(corretorId, tipo, mensagem, emailAnexos, assunto, eventoId)
   }
 
   // WhatsApp: respeita o opt-in (LGPD) e a seleção de canal
@@ -94,7 +115,7 @@ export async function notify(params: NotifyParams): Promise<void> {
   if (!config.evolution.enabled) {
     console.log(`[notify:stub] (${tipo}) → ${whatsapp}${temAnexo ? ' [com anexo]' : ''}\n${mensagem}\n`)
     await prisma.notificacaoLog.create({
-      data: { corretor_id: corretorId, evento_id: eventoId, tipo, status: 'enviado', mensagem },
+      data: { corretor_id: corretorId, evento_id: eventoId, tipo, canal: 'whatsapp', status: 'enviado', mensagem },
     })
     return
   }
@@ -112,7 +133,7 @@ export async function notify(params: NotifyParams): Promise<void> {
         await sendWhatsApp(whatsapp, mensagem, imagemUrl, imagemBase64)
       }
       await prisma.notificacaoLog.create({
-        data: { corretor_id: corretorId, evento_id: eventoId, tipo, status: 'enviado', mensagem },
+        data: { corretor_id: corretorId, evento_id: eventoId, tipo, canal: 'whatsapp', status: 'enviado', mensagem },
       })
     } catch (err) {
       await prisma.notificacaoLog.create({
@@ -120,6 +141,7 @@ export async function notify(params: NotifyParams): Promise<void> {
           corretor_id: corretorId,
           evento_id:   eventoId,
           tipo,
+          canal:       'whatsapp',
           status:      'erro',
           mensagem,
           erro:        err instanceof Error ? err.message : String(err),
@@ -150,7 +172,7 @@ export async function notifyDocument(params: NotifyDocParams): Promise<void> {
 
   // E-mail com o documento em anexo (canal independente do opt-in)
   if (canais?.email !== false) {
-    enviarEmailNotificacao(corretorId, tipo, caption, [{ name: fileName, contentBytes: base64, contentType: 'application/pdf' }])
+    enviarEmailNotificacao(corretorId, tipo, caption, [{ name: fileName, contentBytes: base64, contentType: 'application/pdf' }], undefined, eventoId)
   }
 
   if (canais?.whatsapp === false || !optIn) return
@@ -158,7 +180,7 @@ export async function notifyDocument(params: NotifyDocParams): Promise<void> {
   if (!config.evolution.enabled) {
     console.log(`[notify:stub doc] (${tipo}) → ${whatsapp} [${fileName}]`)
     await prisma.notificacaoLog.create({
-      data: { corretor_id: corretorId, evento_id: eventoId, tipo, status: 'enviado', mensagem: caption },
+      data: { corretor_id: corretorId, evento_id: eventoId, tipo, canal: 'whatsapp', status: 'enviado', mensagem: caption },
     })
     return
   }
@@ -169,12 +191,12 @@ export async function notifyDocument(params: NotifyDocParams): Promise<void> {
       const numero = digitos.startsWith('55') ? digitos : `55${digitos}`
       await sendDocument(numero, base64, fileName, caption)
       await prisma.notificacaoLog.create({
-        data: { corretor_id: corretorId, evento_id: eventoId, tipo, status: 'enviado', mensagem: caption },
+        data: { corretor_id: corretorId, evento_id: eventoId, tipo, canal: 'whatsapp', status: 'enviado', mensagem: caption },
       })
     } catch (err) {
       await prisma.notificacaoLog.create({
         data: {
-          corretor_id: corretorId, evento_id: eventoId, tipo, status: 'erro', mensagem: caption,
+          corretor_id: corretorId, evento_id: eventoId, tipo, canal: 'whatsapp', status: 'erro', mensagem: caption,
           erro: err instanceof Error ? err.message : String(err),
         },
       })

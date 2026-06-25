@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { fetchImobiliarias } from '@/services/imobiliarias'
 import type { Imobiliaria } from '@/types'
 import { useToast } from '@/hooks/use-toast'
-import { atualizarMeuPerfil, uploadFotoCorretor, atualizarMeuOptIn } from '@/services/corretores'
+import { atualizarMeuPerfil, uploadFotoCorretor, atualizarMeuOptIn, atualizarMeuEmailOptIn } from '@/services/corretores'
 import { getErrorMessage } from '@/lib/errors'
 
 function maskCPF(v: string) {
@@ -57,6 +57,8 @@ export function CorretorPerfil() {
   const [senhaModalOpen, setSenhaModalOpen] = useState(false)
   const [optIn, setOptIn] = useState<boolean>(corretor?.whatsapp_opt_in ?? false)
   const [savingOptIn, setSavingOptIn] = useState(false)
+  const [emailOptIn, setEmailOptIn] = useState<boolean>(corretor?.email_opt_in ?? true)
+  const [savingEmailOptIn, setSavingEmailOptIn] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
 
@@ -179,6 +181,24 @@ export function CorretorPerfil() {
       toast({ title: 'Erro ao salvar', description: getErrorMessage(err), variant: 'destructive' })
     } finally {
       setSavingOptIn(false)
+    }
+  }
+
+  const handleToggleEmailOptIn = async () => {
+    const novo = !emailOptIn
+    setEmailOptIn(novo)
+    setSavingEmailOptIn(true)
+    try {
+      await atualizarMeuEmailOptIn(novo)
+      toast({
+        title: novo ? 'E-mails ativados' : 'E-mails desativados',
+        description: novo ? 'Você voltará a receber e-mails de divulgação.' : 'Você não receberá mais e-mails de divulgação (avisos essenciais continuam).',
+      })
+    } catch (err) {
+      setEmailOptIn(!novo)
+      toast({ title: 'Erro ao salvar', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setSavingEmailOptIn(false)
     }
   }
 
@@ -430,6 +450,37 @@ export function CorretorPerfil() {
         </div>
         <p className={`text-xs font-medium mt-3 ${optIn ? 'text-green-600' : 'text-gray-400'}`}>
           {savingOptIn ? 'Salvando…' : optIn ? '✓ Notificações ativadas' : 'Notificações desativadas'}
+        </p>
+      </div>
+
+      {/* Notificações por e-mail (consentimento LGPD) */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+              <Mail className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">E-mails de divulgação</p>
+              <p className="text-xs text-gray-500 mt-0.5 max-w-md">
+                Receba por e-mail novidades, novos eventos e comunicados. Avisos essenciais
+                (certificado, redefinição de senha) são sempre enviados.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={emailOptIn}
+            onClick={handleToggleEmailOptIn}
+            disabled={savingEmailOptIn}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-60 ${emailOptIn ? 'bg-green-600' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${emailOptIn ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+        <p className={`text-xs font-medium mt-3 ${emailOptIn ? 'text-green-600' : 'text-gray-400'}`}>
+          {savingEmailOptIn ? 'Salvando…' : emailOptIn ? '✓ E-mails ativados' : 'E-mails de divulgação desativados'}
         </p>
       </div>
 

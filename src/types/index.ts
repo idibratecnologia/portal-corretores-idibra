@@ -38,6 +38,7 @@ export interface Corretor {
   telefone?: string
   whatsapp: string
   whatsapp_opt_in?: boolean
+  email_opt_in?: boolean
   senha_provisoria?: boolean
   foto_url?: string
   imobiliaria_id?: string

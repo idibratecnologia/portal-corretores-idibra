@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Loader2, FileText, Users, Calendar, CheckCircle2 } from 'lucide-react'
+import { Loader2, Users, Calendar, CheckCircle2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/errors'
 import { formatDate, formatDateTime } from '@/lib/utils'
-import { jsPDF } from 'jspdf'
+import { cn } from '@/lib/utils'
+import { ExportMenu, type ExportFormat } from '@/components/shared/ExportMenu'
+import { exportTablePdf, exportExcel, exportCsv, type Cell } from '@/lib/export'
 import { fetchInscricoesByCorretor, fetchInscricoesByEvento } from '@/services/inscricoes'
 import type { RelatorioEvento, RelatorioCorretor } from '@/services/relatorios'
 import type { EventoInscricao } from '@/types'
@@ -22,6 +23,9 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
   const { toast } = useToast()
   const [linhas, setLinhas] = useState<EventoInscricao[]>([])
   const [loading, setLoading] = useState(false)
+  const [escopo, setEscopo] = useState<'todos' | 'presente' | 'ausente'>('todos')
+
+  useEffect(() => { setEscopo('todos') }, [alvo])
 
   useEffect(() => {
     if (!alvo) return
@@ -43,10 +47,14 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
   const resumo: Array<[string, string]> = isCorretor
     ? (() => {
         const c = alvo.dados as RelatorioCorretor
+        const cor0 = linhas[0]?.corretor
         return [
+          ['CPF', cor0?.cpf || '—'],
           ['CRECI', c.creci || '—'],
           ['Imobiliária', c.imobiliaria?.nome || '—'],
           ['Cidade/UF', `${c.cidade}/${c.uf}`],
+          ['WhatsApp', cor0?.whatsapp || '—'],
+          ['E-mail', cor0?.email || '—'],
           ['Eventos inscritos', String(c.total)],
           ['Participações', String(c.presentes)],
           ['Taxa de presença', `${c.taxa}%`],
@@ -64,48 +72,53 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
         ]
       })()
 
-  const exportarPDF = () => {
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-    const W = doc.internal.pageSize.getWidth()
-    let y = 54
+  const ESCOPOS: { valor: typeof escopo; label: string }[] = [
+    { valor: 'todos', label: 'Todos' },
+    { valor: 'presente', label: 'Presentes' },
+    { valor: 'ausente', label: 'Ausentes' },
+  ]
+  const escopoLabel = ESCOPOS.find((e) => e.valor === escopo)!.label
+  const linhasFiltradas = escopo === 'todos' ? linhas : linhas.filter((l) => l.status === escopo)
 
-    doc.setFontSize(10).setTextColor(120)
-    doc.text('IDIBRA — Relatório', 40, y); y += 8
-    doc.setDrawColor(220).line(40, y, W - 40, y); y += 22
+  const exportar = (fmt: ExportFormat) => {
+    const slug = `${titulo.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}${escopo !== 'todos' ? `-${escopo}s` : ''}`
+    const base = `relatorio-${isCorretor ? 'corretor' : 'evento'}-${slug}`
+    const head = isCorretor
+      ? ['Evento', 'Status', 'Check-in']
+      : ['Corretor', 'CPF', 'WhatsApp', 'E-mail', 'Status', 'Check-in']
+    const body: Cell[][] = linhasFiltradas.map((l) => isCorretor
+      ? [
+          l.evento?.titulo ?? '—',
+          STATUS_LABEL[l.status] ?? l.status,
+          l.checkin_at ? formatDateTime(l.checkin_at) : '—',
+        ]
+      : [
+          l.corretor?.nome ?? '—',
+          l.corretor?.cpf ?? '—',
+          l.corretor?.whatsapp ?? '—',
+          l.corretor?.email ?? '—',
+          STATUS_LABEL[l.status] ?? l.status,
+          l.checkin_at ? formatDateTime(l.checkin_at) : '—',
+        ])
+    const subtitle = `${titulo}${escopo !== 'todos' ? ` — ${escopoLabel}` : ''}`
 
-    doc.setFontSize(16).setTextColor(20)
-    doc.text(isCorretor ? `Relatório do corretor` : `Relatório do evento`, 40, y); y += 22
-    doc.setFontSize(13).setTextColor(40)
-    doc.text(titulo, 40, y); y += 20
-
-    doc.setFontSize(10).setTextColor(90)
-    resumo.forEach(([k, v]) => { doc.text(`${k}: ${v}`, 40, y); y += 15 })
-    y += 8
-
-    doc.setFontSize(11).setTextColor(20)
-    doc.text(isCorretor ? 'Eventos' : 'Participantes', 40, y); y += 6
-    doc.setDrawColor(220).line(40, y, W - 40, y); y += 16
-
-    doc.setFontSize(9)
-    const colNome = 40, colStatus = W - 200, colCheck = W - 110
-    doc.setTextColor(130)
-    doc.text(isCorretor ? 'Evento' : 'Corretor', colNome, y)
-    doc.text('Status', colStatus, y)
-    doc.text('Check-in', colCheck, y)
-    y += 12
-    doc.setTextColor(40)
-
-    linhas.forEach((l) => {
-      if (y > doc.internal.pageSize.getHeight() - 40) { doc.addPage(); y = 54 }
-      const nome = isCorretor ? (l.evento?.titulo ?? '—') : (l.corretor?.nome ?? '—')
-      doc.text(String(nome).slice(0, 60), colNome, y)
-      doc.text(STATUS_LABEL[l.status] ?? l.status, colStatus, y)
-      doc.text(l.checkin_at ? formatDateTime(l.checkin_at) : '—', colCheck, y)
-      y += 14
-    })
-
-    const nomeArq = `relatorio-${isCorretor ? 'corretor' : 'evento'}-${titulo.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`
-    doc.save(nomeArq)
+    if (fmt === 'pdf') {
+      exportTablePdf({
+        filename: `${base}.pdf`,
+        title: isCorretor ? 'Relatório do corretor' : 'Relatório do evento',
+        subtitle,
+        resumo,
+        head, body, colWeights: isCorretor ? [3, 1.2, 1.6] : [2, 1.5, 1.4, 2.4, 0.9, 1.4],
+      })
+    } else if (fmt === 'excel') {
+      exportExcel(`${base}.xls`, isCorretor ? 'Corretor' : 'Evento', [
+        ...resumo.map(([k, v]) => [k, v] as Cell[]),
+        [],
+        head, ...body,
+      ])
+    } else {
+      exportCsv(`${base}.csv`, [head, ...body])
+    }
   }
 
   return (
@@ -128,13 +141,28 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
           ))}
         </div>
 
+        {/* Escopo do relatório */}
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          <span className="text-xs text-gray-400">Mostrar:</span>
+          {ESCOPOS.map((e) => (
+            <button
+              key={e.valor}
+              onClick={() => setEscopo(e.valor)}
+              className={cn('text-xs font-medium px-3 py-1.5 rounded-lg transition-colors',
+                escopo === e.valor ? 'bg-green-700 text-white' : 'bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100')}
+            >
+              {e.label}
+            </button>
+          ))}
+        </div>
+
         {/* Lista */}
         <div className="mt-2">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">{isCorretor ? 'Eventos' : 'Participantes'} ({linhas.length})</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">{isCorretor ? 'Eventos' : 'Participantes'} ({linhasFiltradas.length})</h3>
           {loading ? (
             <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 text-green-600 animate-spin" /></div>
-          ) : linhas.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">Nenhum registro.</p>
+          ) : linhasFiltradas.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4 text-center">Nenhum registro{escopo !== 'todos' ? ` (${escopoLabel.toLowerCase()})` : ''}.</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-gray-100">
               <table className="w-full text-sm">
@@ -146,9 +174,16 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {linhas.map((l) => (
+                  {linhasFiltradas.map((l) => (
                     <tr key={l.id} className="hover:bg-gray-50/50">
-                      <td className="px-3 py-2 text-gray-800">{isCorretor ? (l.evento?.titulo ?? '—') : (l.corretor?.nome ?? '—')}</td>
+                      <td className="px-3 py-2 text-gray-800">
+                        {isCorretor ? (l.evento?.titulo ?? '—') : (
+                          <>
+                            {l.corretor?.nome ?? '—'}
+                            <span className="block text-[11px] text-gray-400">{[l.corretor?.cpf, l.corretor?.whatsapp, l.corretor?.email].filter(Boolean).join(' · ') || '—'}</span>
+                          </>
+                        )}
+                      </td>
                       <td className="px-3 py-2">
                         <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${l.status === 'presente' ? 'bg-green-100 text-green-700' : l.status === 'ausente' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>
                           {STATUS_LABEL[l.status] ?? l.status}
@@ -163,12 +198,10 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
           )}
         </div>
 
-        <div className="flex justify-end gap-2 pt-1">
-          <Button onClick={exportarPDF} disabled={loading} className="bg-green-700 hover:bg-green-800 gap-1.5">
-            <FileText className="w-4 h-4" /> Exportar PDF
-          </Button>
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <p className="text-[11px] text-gray-400 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {escopo === 'todos' ? 'Todos os registros' : escopoLabel} · gerado dos dados atuais.</p>
+          <ExportMenu onExport={exportar} disabled={loading || linhasFiltradas.length === 0} dropUp />
         </div>
-        <p className="text-[11px] text-gray-400 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Relatório individual gerado a partir dos dados atuais.</p>
       </DialogContent>
     </Dialog>
   )

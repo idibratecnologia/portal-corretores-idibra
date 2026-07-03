@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { fetchCorretores, createCorretor, updateCorretor, setCorretorStatus, deleteCorretor } from '@/services/corretores'
+import { fetchCorretores, createCorretor, updateCorretor, setCorretorStatus, deleteCorretor, uploadFotoCorretor } from '@/services/corretores'
 import { fetchImobiliarias } from '@/services/imobiliarias'
 import { PENDING_CHANGED_EVENT } from '@/components/admin/AdminSidebar'
 import { useAuth } from '@/contexts/AuthContext'
@@ -140,14 +140,24 @@ export function AdminCorretores() {
     }
   }
 
-  const handleSave = async (data: Partial<Corretor>) => {
+  const handleSave = async (data: Partial<Corretor>, foto?: File) => {
     try {
+      let corretorId: string
       if (editingCorretor) {
         await updateCorretor(editingCorretor.id, data)
+        corretorId = editingCorretor.id
         toast({ title: 'Corretor atualizado', description: 'Dados salvos com sucesso.' })
       } else {
-        await createCorretor(data as Parameters<typeof createCorretor>[0])
+        const created = await createCorretor(data as Parameters<typeof createCorretor>[0])
+        corretorId = created.id
         toast({ title: 'Corretor cadastrado', description: 'Novo corretor criado com sucesso.' })
+      }
+      if (foto) {
+        try {
+          await uploadFotoCorretor(corretorId, foto)
+        } catch (err) {
+          toast({ title: 'Corretor salvo, mas a foto falhou', description: getErrorMessage(err), variant: 'destructive' })
+        }
       }
       setModalOpen(false)
       setEditingCorretor(null)

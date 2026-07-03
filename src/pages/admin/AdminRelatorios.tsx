@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { BarChart3, Download, FileText, Users, Calendar, TrendingUp } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { BarChart3, FileText, Users, Calendar, TrendingUp } from 'lucide-react'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { SkeletonTable } from '@/components/shared/Skeleton'
+import { ExportMenu, type ExportFormat } from '@/components/shared/ExportMenu'
+import { exportCsv, exportExcel, exportTablePdf } from '@/lib/export'
 import {
   fetchRelatorioEventos, fetchRelatorioCorretores, fetchRelatorioParticipacoes,
 } from '@/services/relatorios'
@@ -27,17 +28,6 @@ const PERIODOS: { key: Periodo; label: string }[] = [
   { key: '365d', label: 'Este ano' },
   { key: 'all',  label: 'Tudo'     },
 ]
-
-function downloadCSV(filename: string, rows: string[][]) {
-  const csv = rows.map((r) => r.map((cell) => `"${cell}"`).join(',')).join('\n')
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 const taxaBadge = (pct: number) =>
   cn('text-xs font-bold px-2.5 py-0.5 rounded-full',
@@ -80,29 +70,37 @@ export function AdminRelatorios() {
     ? Math.round((totalPresentes / (totalPresentes + totalAusentes)) * 100)
     : 0
 
-  const exportEventos = () =>
-    downloadCSV('relatorio-eventos.csv', [
-      ['Evento', 'Data', 'Tipo', 'Status', 'Inscritos', 'Presentes', 'Ausentes', 'Taxa (%)'],
-      ...eventStats.map((e) => [e.titulo, formatDate(e.data_evento), e.tipo, e.status, String(e.total), String(e.presentes), String(e.ausentes), String(e.taxa)]),
-    ])
+  const periodoLabel = `Período: ${PERIODOS.find((p) => p.key === periodo)?.label ?? 'Tudo'}`
 
-  const exportCorretores = () =>
-    downloadCSV('relatorio-corretores.csv', [
-      ['Corretor', 'CRECI', 'Imobiliária', 'Cidade/UF', 'Eventos', 'Participações', 'Taxa (%)'],
-      ...corretorStats.map((c) => [c.nome, c.creci, c.imobiliaria?.nome || '', `${c.cidade}/${c.uf}`, String(c.total), String(c.presentes), String(c.taxa)]),
-    ])
+  const exportEventos = (fmt: ExportFormat) => {
+    const head = ['Evento', 'Data', 'Tipo', 'Status', 'Inscritos', 'Presentes', 'Ausentes', 'Taxa (%)']
+    const body = eventStats.map((e) => [e.titulo, formatDate(e.data_evento), e.tipo, e.status, e.total, e.presentes, e.ausentes, e.taxa])
+    if (fmt === 'pdf') exportTablePdf({ filename: 'relatorio-eventos.pdf', title: 'Relatório de Eventos', subtitle: periodoLabel, head, body, colWeights: [3, 1.3, 1.3, 1.3, 1, 1, 1, 1] })
+    else if (fmt === 'excel') exportExcel('relatorio-eventos.xls', 'Eventos', [head, ...body])
+    else exportCsv('relatorio-eventos.csv', [head, ...body])
+  }
 
-  const exportParticipacoes = () =>
-    downloadCSV('relatorio-participacoes.csv', [
-      ['Corretor', 'Evento', 'Data Evento', 'Status', 'Check-in'],
-      ...participacoes.map((p) => [
-        p.corretor?.nome || '',
-        p.evento?.titulo || '',
-        p.evento ? formatDate(p.evento.data_evento) : '',
-        p.status,
-        p.checkin_at ? new Date(p.checkin_at).toLocaleString('pt-BR') : '',
-      ]),
+  const exportCorretores = (fmt: ExportFormat) => {
+    const head = ['Corretor', 'CRECI', 'Imobiliária', 'Cidade/UF', 'Eventos', 'Participações', 'Taxa (%)']
+    const body = corretorStats.map((c) => [c.nome, c.creci, c.imobiliaria?.nome || '', `${c.cidade}/${c.uf}`, c.total, c.presentes, c.taxa])
+    if (fmt === 'pdf') exportTablePdf({ filename: 'relatorio-corretores.pdf', title: 'Relatório de Corretores', subtitle: periodoLabel, head, body, colWeights: [2.6, 1, 2, 1.4, 1, 1.2, 1] })
+    else if (fmt === 'excel') exportExcel('relatorio-corretores.xls', 'Corretores', [head, ...body])
+    else exportCsv('relatorio-corretores.csv', [head, ...body])
+  }
+
+  const exportParticipacoes = (fmt: ExportFormat) => {
+    const head = ['Corretor', 'Evento', 'Data Evento', 'Status', 'Check-in']
+    const body = participacoes.map((p) => [
+      p.corretor?.nome || '',
+      p.evento?.titulo || '',
+      p.evento ? formatDate(p.evento.data_evento) : '',
+      p.status,
+      p.checkin_at ? new Date(p.checkin_at).toLocaleString('pt-BR') : '',
     ])
+    if (fmt === 'pdf') exportTablePdf({ filename: 'relatorio-participacoes.pdf', title: 'Relatório de Participações', subtitle: periodoLabel, head, body, colWeights: [2, 2.4, 1.3, 1.1, 1.8] })
+    else if (fmt === 'excel') exportExcel('relatorio-participacoes.xls', 'Participações', [head, ...body])
+    else exportCsv('relatorio-participacoes.csv', [head, ...body])
+  }
 
   return (
     <div className="space-y-6">
@@ -179,9 +177,7 @@ export function AdminRelatorios() {
           <div>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
               <p className="text-xs text-gray-500">{eventStats.length} evento(s)</p>
-              <Button onClick={exportEventos} variant="outline" size="sm" className="gap-2 rounded-xl h-8 text-xs">
-                <Download className="w-3.5 h-3.5" /> Exportar CSV
-              </Button>
+              <ExportMenu onExport={exportEventos} disabled={isLoading || eventStats.length === 0} />
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -234,9 +230,7 @@ export function AdminRelatorios() {
           <div>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
               <p className="text-xs text-gray-500">{corretorStats.length} corretor(es)</p>
-              <Button onClick={exportCorretores} variant="outline" size="sm" className="gap-2 rounded-xl h-8 text-xs">
-                <Download className="w-3.5 h-3.5" /> Exportar CSV
-              </Button>
+              <ExportMenu onExport={exportCorretores} disabled={isLoading || corretorStats.length === 0} />
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -295,9 +289,7 @@ export function AdminRelatorios() {
           <div>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
               <p className="text-xs text-gray-500">{participacoes.length} registro(s)</p>
-              <Button onClick={exportParticipacoes} variant="outline" size="sm" className="gap-2 rounded-xl h-8 text-xs">
-                <Download className="w-3.5 h-3.5" /> Exportar CSV
-              </Button>
+              <ExportMenu onExport={exportParticipacoes} disabled={isLoading || participacoes.length === 0} />
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Plus, Search, Eye, Edit2, CheckCircle, XCircle,
-  PlayCircle, StopCircle, Calendar, Ban, ChevronUp, ChevronDown, BadgeCheck, Trash2, Award,
+  Plus, Search, Eye, Edit2, CheckCircle,
+  PlayCircle, Flag, Calendar, Ban, ChevronUp, ChevronDown, BadgeCheck, Trash2, Award,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -424,17 +424,17 @@ export function AdminEventos() {
                                   )}
                                   <button
                                     onClick={() => setConfirmAction({ evento, action: 'encerrar' })}
-                                    title="Encerrar evento"
-                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 hover:scale-105 transition-all"
+                                    title="Encerrar evento (conclui e para novas inscrições)"
+                                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 hover:scale-105 text-xs font-semibold transition-all"
                                   >
-                                    <StopCircle className="w-3.5 h-3.5" />
+                                    <Flag className="w-3.5 h-3.5" /> Encerrar
                                   </button>
                                   <button
                                     onClick={() => setConfirmAction({ evento, action: 'cancelar' })}
-                                    title="Cancelar evento"
-                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 hover:scale-105 transition-all"
+                                    title="Cancelar evento (desmarca o evento)"
+                                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 hover:scale-105 text-xs font-semibold transition-all"
                                   >
-                                    <XCircle className="w-3.5 h-3.5" />
+                                    <Ban className="w-3.5 h-3.5" /> Cancelar
                                   </button>
                                 </>
                               )}
@@ -490,8 +490,8 @@ export function AdminEventos() {
           <AlertDialogHeader>
             <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center mb-1', confirmAction?.action === 'cancelar' ? 'bg-red-50' : 'bg-amber-50')}>
               {confirmAction?.action === 'cancelar'
-                ? <XCircle className="w-6 h-6 text-red-500" />
-                : <StopCircle className="w-6 h-6 text-amber-500" />}
+                ? <Ban className="w-6 h-6 text-red-500" />
+                : <Flag className="w-6 h-6 text-amber-500" />}
             </div>
             <AlertDialogTitle className="text-base">
               {confirmAction?.action === 'cancelar' ? 'Cancelar evento?' : 'Encerrar evento?'}
@@ -499,7 +499,7 @@ export function AdminEventos() {
             <AlertDialogDescription className="text-sm">
               {confirmAction?.action === 'cancelar'
                 ? <>O evento <strong>"{confirmAction?.evento.titulo}"</strong> será cancelado. Todos os inscritos serão notificados. Esta ação não pode ser desfeita.</>
-                : <>O evento <strong>"{confirmAction?.evento.titulo}"</strong> será encerrado e não aceitará novas inscrições.</>}
+                : <>O evento <strong>"{confirmAction?.evento.titulo}"</strong> será encerrado e não aceitará novas inscrições. Os inscritos que <strong>não</strong> fizeram check-in serão marcados como <strong>ausentes</strong>.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

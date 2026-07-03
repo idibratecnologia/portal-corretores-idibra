@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { Camera, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -42,7 +43,7 @@ const schema = z.object({
   creci: z.string().min(1, 'CRECI obrigatório'),
   email: z.string().email('E-mail inválido'),
   whatsapp: z.string().min(14, 'WhatsApp inválido'),
-  imobiliaria_id: z.string().optional(),
+  imobiliaria_id: z.string().min(1, 'Selecione uma imobiliária'),
   cidade: z.string().min(1, 'Cidade obrigatória'),
   uf: z.string().min(2, 'UF obrigatória'),
   instagram: z.string().optional(),
@@ -56,16 +57,32 @@ type FormData = z.infer<typeof schema>
 interface CorretorModalProps {
   open: boolean
   onClose: () => void
-  onSave: (data: Partial<Corretor>) => void
+  onSave: (data: Partial<Corretor>, foto?: File) => void
   corretor: Corretor | null
 }
 
 export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModalProps) {
   const [imobiliarias, setImobiliarias] = useState<Imobiliaria[]>([])
+  const [foto, setFoto] = useState<File | null>(null)
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null)
 
   useEffect(() => {
     if (open) fetchImobiliarias().then(setImobiliarias).catch(() => {})
   }, [open])
+
+  // reinicia a foto ao abrir/trocar de corretor (mostra a existente na edição)
+  useEffect(() => {
+    setFoto(null)
+    setFotoPreview(corretor?.foto_url ?? null)
+  }, [corretor, open])
+
+  const onFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    if (f.size > 5 * 1024 * 1024) return   // 5 MB máx.
+    setFoto(f)
+    setFotoPreview(URL.createObjectURL(f))
+  }
 
   const {
     register,
@@ -98,7 +115,7 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
   }, [corretor, reset])
 
   const onSubmit = (data: FormData) =>
-    onSave({ ...data, data_nascimento: data.data_nascimento || null })
+    onSave({ ...data, data_nascimento: data.data_nascimento || null }, foto ?? undefined)
 
   function maskedField(
     field: 'cpf' | 'whatsapp',
@@ -123,6 +140,30 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Foto de perfil */}
+            <div className="sm:col-span-2 flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0 border border-gray-200">
+                {fotoPreview
+                  ? <img src={fotoPreview} alt="Foto do corretor" className="w-full h-full object-cover" />
+                  : <Camera className="w-6 h-6 text-gray-300" />}
+              </div>
+              <div>
+                <Label>Foto de perfil</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <label className="cursor-pointer text-sm text-green-700 hover:text-green-800 font-medium inline-flex items-center gap-1.5 border border-gray-200 rounded-lg px-3 py-1.5">
+                    <Camera className="w-4 h-4" /> {fotoPreview ? 'Trocar foto' : 'Escolher foto'}
+                    <input type="file" accept="image/*" onChange={onFotoChange} className="hidden" />
+                  </label>
+                  {foto && (
+                    <button type="button" onClick={() => { setFoto(null); setFotoPreview(corretor?.foto_url ?? null) }} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Remover">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">JPG/PNG até 5 MB (opcional).</p>
+              </div>
+            </div>
+
             <div className="sm:col-span-2">
               <Label>Nome completo *</Label>
               <Input {...register('nome')} className="mt-1" />
@@ -154,7 +195,7 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
             </div>
 
             <div className="sm:col-span-2">
-              <Label>Imobiliária</Label>
+              <Label>Imobiliária *</Label>
               <select
                 {...register('imobiliaria_id')}
                 className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -164,6 +205,7 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
                   <option key={i.id} value={i.id}>{i.nome}</option>
                 ))}
               </select>
+              {errors.imobiliaria_id && <p className="text-xs text-red-500 mt-1">{errors.imobiliaria_id.message}</p>}
             </div>
 
             <div>

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Users, CheckCircle, XCircle, Eye, MapPin, Calendar, Clock, QrCode, X, ScanLine, Tv2, BadgeCheck, Loader2, Maximize2, Send, Download, Award } from 'lucide-react'
+import { Users, CheckCircle, XCircle, Eye, MapPin, Calendar, Clock, QrCode, X, ScanLine, Tv2, BadgeCheck, Loader2, Maximize2, Send, Download, Award, FolderOpen, GraduationCap, Palette } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BackButton } from '@/components/shared/BackButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -10,6 +10,8 @@ import { QrScanner } from '@/components/shared/QrScanner'
 import { EventoMateriais } from '@/components/shared/EventoMateriais'
 import { EventoTreinamentosAdmin } from '@/components/admin/EventoTreinamentosAdmin'
 import { EventoModelosAdmin } from '@/components/admin/EventoModelosAdmin'
+import { CollapsibleCard } from '@/components/shared/CollapsibleCard'
+import { TablePagination } from '@/components/shared/TablePagination'
 import { ShareEventoButton } from '@/components/shared/ShareEventoButton'
 import { fetchEventoById, updateEvento } from '@/services/eventos'
 import { fetchInscricoesByEvento, realizarCheckin, setInscricaoStatus, reenviarQrInscricao, exportarPresencaCsv, enviarCertificadosEvento } from '@/services/inscricoes'
@@ -37,6 +39,10 @@ export function AdminEventoDetalhes() {
   const [scanResult, setScanResult] = useState<{ ok: boolean; message: string; name?: string } | null>(null)
   const [manualToken, setManualToken] = useState('')
   const scanResultTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Lista de inscritos: filtro por status + paginação
+  const [fStatus, setFStatus] = useState<'' | 'inscrito' | 'presente' | 'ausente' | 'cancelado'>('')
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 15
 
   const loadData = useCallback(async () => {
     if (!id) return
@@ -57,6 +63,9 @@ export function AdminEventoDetalhes() {
 
   useEffect(() => { loadData() }, [loadData])
   useRealtimeRefresh(loadData)
+
+  // volta para a primeira página quando muda o filtro
+  useEffect(() => { setPage(1) }, [fStatus])
 
   if (isLoading) {
     return (
@@ -79,6 +88,17 @@ export function AdminEventoDetalhes() {
   const total_presentes = inscricoes.filter((i) => i.status === 'presente').length
   const total_ausentes = inscricoes.filter((i) => i.status === 'ausente').length
   const taxa = total_inscritos > 0 ? ((total_presentes / total_inscritos) * 100).toFixed(1) : '0.0'
+
+  const countStatus = (s: string) => inscricoes.filter((i) => i.status === s).length
+  const inscritosFiltrados = fStatus ? inscricoes.filter((i) => i.status === fStatus) : inscricoes
+  const inscritosPagina = inscritosFiltrados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const FILTROS: { valor: typeof fStatus; label: string; count: number }[] = [
+    { valor: '', label: 'Todos', count: inscricoes.length },
+    { valor: 'inscrito', label: 'Inscritos', count: countStatus('inscrito') },
+    { valor: 'presente', label: 'Presentes', count: countStatus('presente') },
+    { valor: 'ausente', label: 'Ausentes', count: countStatus('ausente') },
+    { valor: 'cancelado', label: 'Cancelados', count: countStatus('cancelado') },
+  ]
 
   const handleStatus = async (inscricaoId: string, status: 'presente' | 'ausente' | 'cancelado') => {
     try {
@@ -370,14 +390,24 @@ export function AdminEventoDetalhes() {
         )}
       </div>
 
-      {/* Materiais do evento */}
-      {id && <EventoMateriais eventoId={id} admin />}
+      {/* Seções recolhíveis (começam fechadas) */}
+      {id && (
+        <CollapsibleCard title="Materiais do evento" icon={FolderOpen}>
+          <EventoMateriais eventoId={id} admin embedded />
+        </CollapsibleCard>
+      )}
 
-      {/* Treinamentos do evento */}
-      {id && <EventoTreinamentosAdmin eventoId={id} />}
+      {id && (
+        <CollapsibleCard title="Treinamentos do evento" icon={GraduationCap}>
+          <EventoTreinamentosAdmin eventoId={id} embedded />
+        </CollapsibleCard>
+      )}
 
-      {/* Artes / Modelos do evento */}
-      {id && <EventoModelosAdmin eventoId={id} />}
+      {id && (
+        <CollapsibleCard title="Artes / Modelos do evento" icon={Palette}>
+          <EventoModelosAdmin eventoId={id} embedded />
+        </CollapsibleCard>
+      )}
 
       {/* Inscritos table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -398,12 +428,29 @@ export function AdminEventoDetalhes() {
           )}
         </div>
 
+        {/* Filtro por status */}
+        {inscricoes.length > 0 && (
+          <div className="px-4 sm:px-6 py-3 border-b border-gray-100 flex flex-wrap gap-2">
+            {FILTROS.map((f) => (
+              <button
+                key={f.valor || 'todos'}
+                onClick={() => setFStatus(f.valor)}
+                className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${fStatus === f.valor ? 'bg-green-700 text-white' : 'bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100'}`}
+              >
+                {f.label} <span className={fStatus === f.valor ? 'text-green-100' : 'text-gray-400'}>({f.count})</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {inscricoes.length === 0 ? (
           <EmptyState
             icon={Users}
             title="Nenhum inscrito ainda"
             description="Os corretores ainda não se inscreveram neste evento."
           />
+        ) : inscritosFiltrados.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-10">Nenhum inscrito com esse status.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -419,7 +466,7 @@ export function AdminEventoDetalhes() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {inscricoes.map((inscricao) => (
+                {inscritosPagina.map((inscricao) => (
                   <tr key={inscricao.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{inscricao.corretor?.nome || '—'}</p>
@@ -494,6 +541,7 @@ export function AdminEventoDetalhes() {
                 ))}
               </tbody>
             </table>
+            <TablePagination total={inscritosFiltrados.length} page={page} pageSize={PAGE_SIZE} onPage={setPage} />
           </div>
         )}
       </div>

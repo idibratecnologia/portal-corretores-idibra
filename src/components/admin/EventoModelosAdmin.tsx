@@ -21,7 +21,7 @@ type FormatoLote = 'pdf' | 'zip-png' | 'zip-pdf'
 
 const TIPOS: TipoModelo[] = ['credenciamento', 'cracha', 'certificado']
 
-export function EventoModelosAdmin({ eventoId }: { eventoId: string }) {
+export function EventoModelosAdmin({ eventoId, embedded = false }: { eventoId: string; embedded?: boolean }) {
   const { toast } = useToast()
   const [vinculos, setVinculos] = useState<EventoModeloVinculo[]>([])
   const [modelos, setModelos] = useState<ModeloVisual[]>([])
@@ -130,19 +130,19 @@ export function EventoModelosAdmin({ eventoId }: { eventoId: string }) {
     }
   }
 
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
-        <h2 className="font-semibold text-gray-900 flex items-center gap-2"><Palette className="w-4 h-4 text-green-600" /> Artes / Modelos do evento</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Pré-visualizar com:</span>
-          <select value={inscritoId} onChange={(e) => setInscritoId(e.target.value)} className="h-9 rounded-md border border-gray-200 px-2 text-sm max-w-[220px]">
-            <option value="">Dados fictícios</option>
-            {inscritos.map((i) => <option key={i.id} value={i.id}>{i.corretor?.nome ?? 'Corretor'}{i.status === 'presente' ? ' ✓' : ''}</option>)}
-          </select>
-        </div>
-      </div>
+  const previewToolbar = (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-gray-500">Pré-visualizar com:</span>
+      <select value={inscritoId} onChange={(e) => setInscritoId(e.target.value)} className="h-9 rounded-md border border-gray-200 px-2 text-sm max-w-[220px]">
+        <option value="">Dados fictícios</option>
+        {inscritos.map((i) => <option key={i.id} value={i.id}>{i.corretor?.nome ?? 'Corretor'}{i.status === 'presente' ? ' ✓' : ''}</option>)}
+      </select>
+    </div>
+  )
 
+  const body = (
+    <>
+      {embedded && <div className="px-6 pt-4 flex justify-end">{previewToolbar}</div>}
       <div className="p-6">
         {loading ? (
           <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 text-green-600 animate-spin" /></div>
@@ -262,6 +262,18 @@ export function EventoModelosAdmin({ eventoId }: { eventoId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  )
+
+  if (embedded) return body
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="font-semibold text-gray-900 flex items-center gap-2"><Palette className="w-4 h-4 text-green-600" /> Artes / Modelos do evento</h2>
+        {previewToolbar}
+      </div>
+      {body}
     </div>
   )
 }

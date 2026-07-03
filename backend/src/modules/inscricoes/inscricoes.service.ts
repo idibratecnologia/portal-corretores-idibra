@@ -20,7 +20,7 @@ import { formatDataEvento } from '@/lib/format'
 const inscricaoInclude = {
   corretor: {
     select: {
-      id: true, nome: true, cpf: true, creci: true, whatsapp: true,
+      id: true, nome: true, cpf: true, creci: true, whatsapp: true, email: true,
       imobiliaria: { select: { id: true, nome: true } },
     },
   },

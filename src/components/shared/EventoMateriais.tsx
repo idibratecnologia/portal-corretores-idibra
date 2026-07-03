@@ -11,9 +11,11 @@ interface Props {
   eventoId: string
   /** true = admin (adicionar/remover); false = corretor (só visualizar). */
   admin?: boolean
+  /** true = renderiza só o conteúdo (sem cartão/cabeçalho), para uso em accordion. */
+  embedded?: boolean
 }
 
-export function EventoMateriais({ eventoId, admin = false }: Props) {
+export function EventoMateriais({ eventoId, admin = false, embedded = false }: Props) {
   const { toast } = useToast()
   const [itens, setItens] = useState<EventoMaterial[]>([])
   const [loading, setLoading] = useState(true)
@@ -79,15 +81,8 @@ export function EventoMateriais({ eventoId, admin = false }: Props) {
     }
   }
 
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-        <FolderOpen className="w-4 h-4 text-green-600" />
-        <h2 className="font-semibold text-gray-900">Materiais do evento</h2>
-        {!admin && <span className="text-xs text-gray-400">(disponível para inscritos)</span>}
-      </div>
-
-      <div className="p-6 space-y-4">
+  const body = (
+    <div className="p-6 space-y-4">
         {/* Lista */}
         {loading ? (
           <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 text-green-600 animate-spin" /></div>
@@ -148,6 +143,18 @@ export function EventoMateriais({ eventoId, admin = false }: Props) {
           </div>
         )}
       </div>
+  )
+
+  if (embedded) return body
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+        <FolderOpen className="w-4 h-4 text-green-600" />
+        <h2 className="font-semibold text-gray-900">Materiais do evento</h2>
+        {!admin && <span className="text-xs text-gray-400">(disponível para inscritos)</span>}
+      </div>
+      {body}
     </div>
   )
 }

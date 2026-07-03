@@ -14,7 +14,7 @@ import {
   type VinculoTreinamento, type Treinamento,
 } from '@/services/treinamentos'
 
-export function EventoTreinamentosAdmin({ eventoId }: { eventoId: string }) {
+export function EventoTreinamentosAdmin({ eventoId, embedded = false }: { eventoId: string; embedded?: boolean }) {
   const { toast } = useToast()
   const [vinculos, setVinculos] = useState<VinculoTreinamento[]>([])
   const [todos, setTodos] = useState<Treinamento[]>([])
@@ -99,13 +99,8 @@ export function EventoTreinamentosAdmin({ eventoId }: { eventoId: string }) {
     }
   }
 
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-        <GraduationCap className="w-4 h-4 text-green-600" />
-        <h2 className="font-semibold text-gray-900">Treinamentos do evento</h2>
-      </div>
-
+  const body = (
+    <>
       <div className="p-6 space-y-4">
         {loading ? (
           <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 text-green-600 animate-spin" /></div>
@@ -180,6 +175,18 @@ export function EventoTreinamentosAdmin({ eventoId }: { eventoId: string }) {
       </div>
 
       <TreinamentoFormModal open={formOpen} onOpenChange={setFormOpen} treinamento={null} onSaved={onCriado} />
+    </>
+  )
+
+  if (embedded) return body
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+        <GraduationCap className="w-4 h-4 text-green-600" />
+        <h2 className="font-semibold text-gray-900">Treinamentos do evento</h2>
+      </div>
+      {body}
     </div>
   )
 }

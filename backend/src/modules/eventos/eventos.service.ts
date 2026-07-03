@@ -217,6 +217,16 @@ export async function setStatus(id: string, status: 'rascunho' | 'publicado' | '
     )
   }
 
+  // Encerramento → quem ficou apenas "inscrito" (não fez check-in) vira "ausente".
+  // Presentes e cancelados não são tocados. Assim os relatórios ficam corretos e
+  // ausentes não constam como pendência nem recebem certificado (só presentes recebem).
+  if (status === 'encerrado' && evento.status !== 'encerrado') {
+    await prisma.inscricao.updateMany({
+      where: { evento_id: id, status: 'inscrito' },
+      data:  { status: 'ausente' },
+    })
+  }
+
   // Publicação → divulga o novo evento (apenas o "vencedor" da transição)
   if (venceuPublicacao) {
     await broadcastEventoNovo(updated)

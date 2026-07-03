@@ -6,6 +6,7 @@ import { getErrorMessage } from '@/lib/errors'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { ExportMenu, type ExportFormat } from '@/components/shared/ExportMenu'
+import { TablePagination } from '@/components/shared/TablePagination'
 import { exportTablePdf, exportExcel, exportCsv, type Cell } from '@/lib/export'
 import { fetchInscricoesByCorretor, fetchInscricoesByEvento } from '@/services/inscricoes'
 import type { RelatorioEvento, RelatorioCorretor } from '@/services/relatorios'
@@ -24,8 +25,11 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
   const [linhas, setLinhas] = useState<EventoInscricao[]>([])
   const [loading, setLoading] = useState(false)
   const [escopo, setEscopo] = useState<'todos' | 'presente' | 'ausente'>('todos')
+  const [pagina, setPagina] = useState(1)
+  const PAGE_SIZE = 8
 
-  useEffect(() => { setEscopo('todos') }, [alvo])
+  useEffect(() => { setEscopo('todos'); setPagina(1) }, [alvo])
+  useEffect(() => { setPagina(1) }, [escopo])
 
   useEffect(() => {
     if (!alvo) return
@@ -79,6 +83,7 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
   ]
   const escopoLabel = ESCOPOS.find((e) => e.valor === escopo)!.label
   const linhasFiltradas = escopo === 'todos' ? linhas : linhas.filter((l) => l.status === escopo)
+  const linhasPagina = linhasFiltradas.slice((pagina - 1) * PAGE_SIZE, pagina * PAGE_SIZE)
 
   const exportar = (fmt: ExportFormat) => {
     const slug = `${titulo.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}${escopo !== 'todos' ? `-${escopo}s` : ''}`
@@ -123,8 +128,8 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
 
   return (
     <Dialog open={!!alvo} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[88vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             {isCorretor ? <Users className="w-5 h-5 text-green-600" /> : <Calendar className="w-5 h-5 text-green-600" />}
             {titulo}
@@ -132,7 +137,7 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
         </DialogHeader>
 
         {/* Resumo */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 flex-shrink-0">
           {resumo.map(([k, v]) => (
             <div key={k} className="bg-gray-50 rounded-xl p-3">
               <p className="text-[11px] text-gray-500">{k}</p>
@@ -142,7 +147,7 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
         </div>
 
         {/* Escopo do relatório */}
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
+        <div className="flex items-center gap-2 mt-1 flex-wrap flex-shrink-0">
           <span className="text-xs text-gray-400">Mostrar:</span>
           {ESCOPOS.map((e) => (
             <button
@@ -156,50 +161,54 @@ export function RelatorioIndividualModal({ alvo, onClose }: { alvo: Alvo | null;
           ))}
         </div>
 
-        {/* Lista */}
-        <div className="mt-2">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">{isCorretor ? 'Eventos' : 'Participantes'} ({linhasFiltradas.length})</h3>
+        {/* Lista (rola só aqui, com paginação) */}
+        <div className="mt-2 flex-1 min-h-0 flex flex-col">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex-shrink-0">{isCorretor ? 'Eventos' : 'Participantes'} ({linhasFiltradas.length})</h3>
           {loading ? (
             <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 text-green-600 animate-spin" /></div>
           ) : linhasFiltradas.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">Nenhum registro{escopo !== 'todos' ? ` (${escopoLabel.toLowerCase()})` : ''}.</p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-100">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50/60">
-                  <tr>
-                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">{isCorretor ? 'Evento' : 'Corretor'}</th>
-                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Status</th>
-                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 hidden sm:table-cell">Check-in</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {linhasFiltradas.map((l) => (
-                    <tr key={l.id} className="hover:bg-gray-50/50">
-                      <td className="px-3 py-2 text-gray-800">
-                        {isCorretor ? (l.evento?.titulo ?? '—') : (
-                          <>
-                            {l.corretor?.nome ?? '—'}
-                            <span className="block text-[11px] text-gray-400">{[l.corretor?.cpf, l.corretor?.whatsapp, l.corretor?.email].filter(Boolean).join(' · ') || '—'}</span>
-                          </>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${l.status === 'presente' ? 'bg-green-100 text-green-700' : l.status === 'ausente' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>
-                          {STATUS_LABEL[l.status] ?? l.status}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-gray-500 text-xs hidden sm:table-cell">{l.checkin_at ? formatDateTime(l.checkin_at) : '—'}</td>
+            <div className="rounded-xl border border-gray-100 flex flex-col min-h-0">
+              <div className="overflow-y-auto min-h-0">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50/60 sticky top-0 z-10">
+                    <tr>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">{isCorretor ? 'Evento' : 'Corretor'}</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Status</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 hidden sm:table-cell">Check-in</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {linhasPagina.map((l) => (
+                      <tr key={l.id} className="hover:bg-gray-50/50">
+                        <td className="px-3 py-2 text-gray-800">
+                          {isCorretor ? (l.evento?.titulo ?? '—') : (
+                            <>
+                              {l.corretor?.nome ?? '—'}
+                              <span className="block text-[11px] text-gray-400">{[l.corretor?.cpf, l.corretor?.whatsapp, l.corretor?.email].filter(Boolean).join(' · ') || '—'}</span>
+                            </>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${l.status === 'presente' ? 'bg-green-100 text-green-700' : l.status === 'ausente' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>
+                            {STATUS_LABEL[l.status] ?? l.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 text-xs hidden sm:table-cell">{l.checkin_at ? formatDateTime(l.checkin_at) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <TablePagination total={linhasFiltradas.length} page={pagina} pageSize={PAGE_SIZE} onPage={setPagina} />
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <p className="text-[11px] text-gray-400 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {escopo === 'todos' ? 'Todos os registros' : escopoLabel} · gerado dos dados atuais.</p>
+        {/* Rodapé fixo */}
+        <div className="flex items-center justify-between gap-2 pt-3 mt-1 border-t border-gray-100 flex-shrink-0">
+          <p className="text-[11px] text-gray-400 flex items-center gap-1"><CheckCircle2 className="w-3 h-3 flex-shrink-0" /> {escopo === 'todos' ? 'Todos os registros' : escopoLabel} · gerado dos dados atuais.</p>
           <ExportMenu onExport={exportar} disabled={loading || linhasFiltradas.length === 0} dropUp />
         </div>
       </DialogContent>

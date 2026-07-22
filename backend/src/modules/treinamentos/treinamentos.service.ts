@@ -29,7 +29,7 @@ const thumbPublicoAulaDir = (tid: string, aid: string) => join(resolve(config.up
 
 // ─── Tipos de input ──────────────────────────────────────────────
 export interface CreateTreinamentoInput {
-  titulo: string; descricao?: string; obrigatorio?: boolean; liberacao_sequencial?: boolean
+  titulo: string; descricao?: string; obrigatorio?: boolean; liberacao_sequencial?: boolean; avulso?: boolean
 }
 export type UpdateTreinamentoInput = Partial<CreateTreinamentoInput> & { ativo?: boolean }
 
@@ -102,6 +102,7 @@ export async function createTreinamento(input: CreateTreinamentoInput) {
       descricao: input.descricao ?? '',
       obrigatorio: input.obrigatorio ?? false,
       liberacao_sequencial: input.liberacao_sequencial ?? false,
+      avulso: input.avulso ?? false,
     },
   })
   emitAdminRefresh('treinamento-criado')
@@ -364,15 +365,31 @@ export async function meusTreinamentos(corretorId: string) {
     orderBy: { ordem: 'asc' },
     include: { treinamento: { include: { aulas: { orderBy: { ordem: 'asc' } } } }, evento: { select: { id: true, titulo: true } } },
   })
-  const aulaIds = vinculos.flatMap((v) => v.treinamento.aulas.map((a) => a.id))
+
+  // Treinamentos avulsos: disponíveis a todos os corretores, sem depender de evento.
+  const avulsos = await prisma.treinamento.findMany({
+    where: { ativo: true, avulso: true },
+    orderBy: { created_at: 'desc' },
+    include: { aulas: { orderBy: { ordem: 'asc' } } },
+  })
+
+  const aulaIds = [
+    ...vinculos.flatMap((v) => v.treinamento.aulas.map((a) => a.id)),
+    ...avulsos.flatMap((t) => t.aulas.map((a) => a.id)),
+  ]
   const prog = await progressoDoCorretor(aulaIds, corretorId)
 
   const vistos = new Set<string>()
-  const out: Array<ReturnType<typeof montarResumo> & { evento: { id: string; titulo: string } }> = []
+  const out: Array<ReturnType<typeof montarResumo> & { evento: { id: string; titulo: string } | null }> = []
   for (const v of vinculos) {
     if (vistos.has(v.treinamento_id)) continue
     vistos.add(v.treinamento_id)
     out.push({ ...montarResumo(v.treinamento, v.treinamento.aulas, prog, v.obrigatorio), evento: v.evento })
+  }
+  for (const t of avulsos) {
+    if (vistos.has(t.id)) continue
+    vistos.add(t.id)
+    out.push({ ...montarResumo(t, t.aulas, prog), evento: null })
   }
   return out
 }
@@ -409,6 +426,12 @@ export async function getTreinamentoCorretor(id: string, corretorId: string) {
 // ════════════════════════════════════════════════════════════════
 
 async function corretorTemAcesso(treinamentoId: string, corretorId: string): Promise<boolean> {
+  // Treinamento avulso (ativo): disponível a todos os corretores, sem evento.
+  const t = await prisma.treinamento.findUnique({
+    where: { id: treinamentoId }, select: { avulso: true, ativo: true },
+  })
+  if (t?.avulso && t.ativo) return true
+
   const n = await prisma.treinamentoEvento.count({
     where: {
       treinamento_id: treinamentoId,

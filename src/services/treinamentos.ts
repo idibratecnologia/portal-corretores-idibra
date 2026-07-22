@@ -39,6 +39,7 @@ export interface Treinamento {
   ativo: boolean
   obrigatorio: boolean
   liberacao_sequencial: boolean
+  avulso: boolean
   created_at: string
   updated_at: string
   _count?: { aulas: number; eventos: number; documentos: number }
@@ -83,7 +84,7 @@ export interface TreinamentoResumo {
 }
 
 export interface MeuTreinamento extends TreinamentoResumo {
-  evento: { id: string; titulo: string }
+  evento: { id: string; titulo: string } | null
 }
 
 /** Aula na visão do corretor (playlist). */
@@ -146,6 +147,7 @@ export interface TreinamentoPayload {
   descricao?: string
   obrigatorio?: boolean
   liberacao_sequencial?: boolean
+  avulso?: boolean
 }
 
 export interface AulaPayload {

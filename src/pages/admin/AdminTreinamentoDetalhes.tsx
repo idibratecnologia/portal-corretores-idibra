@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Edit2, FileText, Trash2, Plus, Calendar, Star, Users,
-  CheckCircle2, BarChart3, Video, ListVideo, ListOrdered,
+  CheckCircle2, BarChart3, Video, ListVideo, ListOrdered, Globe,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -131,6 +131,7 @@ export function AdminTreinamentoDetalhes() {
             <h1 className="text-2xl font-bold text-gray-900">{t.titulo}</h1>
             {t.obrigatorio && <Star className="w-5 h-5 text-amber-500 fill-amber-500" />}
             {t.liberacao_sequencial && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 inline-flex items-center gap-1"><ListOrdered className="w-3 h-3" /> Sequencial</span>}
+            {t.avulso && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 inline-flex items-center gap-1"><Globe className="w-3 h-3" /> Disponível a todos</span>}
             {!t.ativo && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">Inativo</span>}
           </div>
           {t.descricao && <p className="text-gray-500 text-sm mt-1">{t.descricao}</p>}

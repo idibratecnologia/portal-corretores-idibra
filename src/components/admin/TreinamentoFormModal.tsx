@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, ListVideo } from 'lucide-react'
+import { Loader2, ListVideo, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,6 +17,7 @@ const schema = z.object({
   descricao: z.string().optional(),
   obrigatorio: z.boolean().optional(),
   liberacao_sequencial: z.boolean().optional(),
+  avulso: z.boolean().optional(),
 })
 type FormData = z.infer<typeof schema>
 
@@ -26,6 +27,7 @@ function toPayload(d: FormData): TreinamentoPayload {
     descricao: d.descricao ?? '',
     obrigatorio: d.obrigatorio ?? false,
     liberacao_sequencial: d.liberacao_sequencial ?? false,
+    avulso: d.avulso ?? false,
   }
 }
 
@@ -51,6 +53,7 @@ export function TreinamentoFormModal({ open, onOpenChange, treinamento, onSaved 
       descricao: editing?.descricao ?? '',
       obrigatorio: editing?.obrigatorio ?? false,
       liberacao_sequencial: editing?.liberacao_sequencial ?? false,
+      avulso: editing?.avulso ?? false,
     })
   }, [open, editing, reset])
 
@@ -99,6 +102,15 @@ export function TreinamentoFormModal({ open, onOpenChange, treinamento, onSaved 
                 {sequencial
                   ? 'Cada aula só libera após o corretor concluir a anterior.'
                   : 'Cada aula usa a data de liberação definida nela.'}
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm text-gray-700 p-3 rounded-xl border border-gray-100 bg-gray-50/60">
+            <input type="checkbox" {...register('avulso')} className="rounded border-gray-300 mt-0.5 accent-green-600" />
+            <span>
+              <span className="font-medium flex items-center gap-1.5"><Globe className="w-3.5 h-3.5 text-green-600" /> Disponível a todos os corretores</span>
+              <span className="block text-xs text-gray-400">
+                Libera este treinamento para <strong>todos os corretores ativos</strong>, sem precisar vincular a um evento.
               </span>
             </span>
           </label>

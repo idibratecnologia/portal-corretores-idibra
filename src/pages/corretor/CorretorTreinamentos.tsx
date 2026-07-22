@@ -62,7 +62,7 @@ function Secao({ titulo, icon: Icon, cor, itens }: { titulo: string; icon: typeo
         <Icon className={`w-4 h-4 ${cor}`} /> {titulo} <span className="text-gray-400 font-normal">({itens.length})</span>
       </h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {itens.map((t) => <TreinamentoCorretorCard key={t.id} t={t} eventoTitulo={t.evento.titulo} />)}
+        {itens.map((t) => <TreinamentoCorretorCard key={t.id} t={t} eventoTitulo={t.evento?.titulo ?? 'Treinamento geral'} />)}
       </div>
     </section>
   )

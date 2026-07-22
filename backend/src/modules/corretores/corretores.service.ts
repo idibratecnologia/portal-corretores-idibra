@@ -10,6 +10,7 @@ import { saveImage, deleteImage } from '@/lib/storage'
 import { resolvePagination, buildPaginated } from '@/lib/pagination'
 import { renderMensagem } from '@/modules/templates/templates.service'
 import { enviarLinkResetCorretor } from '@/modules/auth/auth.service'
+import { getRegras } from '@/modules/configuracoes/configuracoes.service'
 import { emitAdminRefresh } from '@/lib/events'
 import { config } from '@/config'
 import type { ListCorretoresInput, CreateCorretorInput, UpdateCorretorInput } from './corretores.schema'
@@ -62,6 +63,7 @@ export async function listCorretores(filters: ListCorretoresInput) {
             { nome:  { contains: filters.search, mode: 'insensitive' } },
             { creci: { contains: filters.search, mode: 'insensitive' } },
             { email: { contains: filters.search, mode: 'insensitive' } },
+            { cpf:   { contains: filters.search, mode: 'insensitive' } },
           ],
         }
       : {}),
@@ -100,6 +102,10 @@ export async function createCorretor(input: CreateCorretorInput) {
   const senhaPlana = input.senha ?? Math.random().toString(36).slice(-10)
   const senhaHash  = await hashPassword(senhaPlana)
 
+  // Respeita a aprovação automática: com ela ligada, o corretor já entra ativo
+  // (senão o admin teria de aprovar mesmo tendo cadastrado).
+  const { auto_approve } = await getRegras()
+
   const corretor = await prisma.corretor.create({
     data: {
       nome:            input.nome,
@@ -116,7 +122,7 @@ export async function createCorretor(input: CreateCorretorInput) {
       uf:              input.uf.toUpperCase(),
       imobiliaria_id:  input.imobiliaria_id,
       observacoes_admin: input.observacoes_admin,
-      status:          'pendente',
+      status:          auto_approve ? 'ativo' : 'pendente',
     },
     select: corretorSelect,
   })
@@ -142,8 +148,14 @@ export async function updateCorretor(id: string, input: UpdateCorretorInput) {
           ...(input.creci ? [{ creci: input.creci }] : []),
         ],
       },
+      select: { nome: true, email: true, cpf: true, creci: true, status: true },
     })
-    if (dup) throw new ConflictError('E-mail, CPF ou CRECI já cadastrado')
+    if (dup) {
+      const quem = `${dup.nome} (${STATUS_LABEL_CORRETOR[dup.status] ?? dup.status})`
+      const campo = input.email && dup.email === input.email ? 'E-mail'
+        : input.cpf && dup.cpf === input.cpf ? 'CPF' : 'CRECI'
+      throw new ConflictError(`${campo} já cadastrado para ${quem}`)
+    }
   }
 
   const corretor = await prisma.corretor.update({
@@ -249,13 +261,19 @@ async function ensureExists(id: string) {
   if (!exists) throw new NotFoundError('Corretor não encontrado')
 }
 
+const STATUS_LABEL_CORRETOR: Record<string, string> = {
+  pendente: 'pendente', ativo: 'ativo', bloqueado: 'bloqueado',
+}
+
 async function ensureUnique(email: string, cpf: string, creci: string) {
   const existing = await prisma.corretor.findFirst({
     where: { OR: [{ email }, { cpf }, { creci }] },
+    select: { nome: true, email: true, cpf: true, creci: true, status: true },
   })
   if (existing) {
-    if (existing.email === email) throw new ConflictError('E-mail já cadastrado')
-    if (existing.cpf   === cpf)   throw new ConflictError('CPF já cadastrado')
-    throw new ConflictError('CRECI já cadastrado')
+    const quem = `${existing.nome} (${STATUS_LABEL_CORRETOR[existing.status] ?? existing.status})`
+    if (existing.email === email) throw new ConflictError(`E-mail já cadastrado para ${quem}`)
+    if (existing.cpf   === cpf)   throw new ConflictError(`CPF já cadastrado para ${quem}`)
+    throw new ConflictError(`CRECI já cadastrado para ${quem}`)
   }
 }

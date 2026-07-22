@@ -9,6 +9,7 @@ export const createTreinamentoSchema = z.object({
   descricao:            z.string().optional(),
   obrigatorio:          z.boolean().optional(),
   liberacao_sequencial: z.boolean().optional(),
+  avulso:               z.boolean().optional(),
 })
 
 export const updateTreinamentoSchema = createTreinamentoSchema.partial().extend({

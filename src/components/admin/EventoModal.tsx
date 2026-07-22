@@ -15,8 +15,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { fetchCorretores } from '@/services/corretores'
-import type { Evento, Corretor } from '@/types'
+import { fetchCorretoresOpcoes, type CorretorOpcao } from '@/services/corretores'
+import type { Evento } from '@/types'
 
 const schema = z.object({
   titulo: z.string().min(1, 'Título obrigatório'),
@@ -67,7 +67,7 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
   // Evento exclusivo + convidados
   const [exclusivo, setExclusivo] = useState(false)
   const [convidados, setConvidados] = useState<string[]>([])
-  const [corretores, setCorretores] = useState<Corretor[]>([])
+  const [corretores, setCorretores] = useState<CorretorOpcao[]>([])
   const [buscaCorr, setBuscaCorr] = useState('')
   const {
     register,
@@ -112,11 +112,11 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
     setBuscaCorr('')
   }, [evento, reset, open])
 
-  // Carrega corretores ativos para a seleção de convidados
+  // Carrega TODOS os corretores ativos para a seleção de convidados (sem paginação)
   useEffect(() => {
     if (open) {
-      fetchCorretores({ status: 'ativo', limit: 1000 })
-        .then((r) => setCorretores(r.data))
+      fetchCorretoresOpcoes()
+        .then(setCorretores)
         .catch(() => setCorretores([]))
     }
   }, [open])

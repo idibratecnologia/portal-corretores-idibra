@@ -68,6 +68,11 @@ export async function corretoresRoutes(app: FastifyInstance) {
     return reply.send(await service.listCorretores(filters))
   })
 
+  // Lista enxuta de TODOS os corretores ativos (para seletores, sem paginação)
+  app.get('/opcoes', { preHandler: [authenticate, requireAdmin] }, async (_req, reply) => {
+    return reply.send(await service.listCorretoresOpcoes())
+  })
+
   app.get('/:id', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
     const { id } = idParam.parse(req.params)
     return reply.send(await service.getCorretorById(id))

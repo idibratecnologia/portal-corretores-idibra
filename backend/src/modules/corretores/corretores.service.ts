@@ -93,6 +93,15 @@ export async function listCorretores(filters: ListCorretoresInput) {
   return buildPaginated(rows.map(mapCorretor), total, page, limit)
 }
 
+/** Lista enxuta de todos os corretores ativos (para seletores, sem paginação). */
+export async function listCorretoresOpcoes() {
+  return prisma.corretor.findMany({
+    where:   { status: 'ativo' },
+    select:  { id: true, nome: true, creci: true },
+    orderBy: { nome: 'asc' },
+  })
+}
+
 // ─── Detalhe ──────────────────────────────────────────────────────
 
 export async function getCorretorById(id: string) {

@@ -15,7 +15,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { fetchEventos, createEvento, updateEvento, setEventoStatus, uploadBannerEvento, deleteEvento } from '@/services/eventos'
+import { fetchEventos, fetchEventoById, createEvento, updateEvento, setEventoStatus, uploadBannerEvento, deleteEvento } from '@/services/eventos'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh'
 import { formatDate } from '@/lib/utils'
@@ -191,6 +191,16 @@ export function AdminEventos() {
     } catch (err) {
       toast({ title: 'Erro ao salvar', description: getErrorMessage(err), variant: 'destructive' })
     }
+  }
+
+  // Abre a edição carregando o evento completo (inclui convidados_ids do exclusivo)
+  const abrirEdicao = async (evento: Evento) => {
+    setEditingEvento(evento)   // mostra já com os dados da lista
+    setModalOpen(true)
+    try {
+      const completo = await fetchEventoById(evento.id)
+      setEditingEvento(completo) // completa com a lista de convidados
+    } catch { /* mantém os dados da lista */ }
   }
 
   const isToday = (dateStr: string) => {
@@ -390,7 +400,7 @@ export function AdminEventos() {
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => { setEditingEvento(evento); setModalOpen(true) }}
+                                onClick={() => abrirEdicao(evento)}
                                 title="Editar evento"
                                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 hover:scale-105 transition-all"
                               >

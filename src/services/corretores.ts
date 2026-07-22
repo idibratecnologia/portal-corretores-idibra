@@ -50,6 +50,14 @@ export async function fetchCorretorById(id: string): Promise<Corretor> {
   return api.get<Corretor>(`/corretores/${id}`)
 }
 
+export interface CorretorOpcao { id: string; nome: string; creci: string }
+
+/** Lista enxuta de todos os corretores ativos (para seletores, sem paginação). */
+export async function fetchCorretoresOpcoes(): Promise<CorretorOpcao[]> {
+  if (USE_MOCK) return []
+  return api.get<CorretorOpcao[]>('/corretores/opcoes')
+}
+
 /** Perfil do corretor logado (rota autenticada /corretores/me) */
 export async function fetchMeuPerfil(): Promise<Corretor> {
   if (USE_MOCK) {

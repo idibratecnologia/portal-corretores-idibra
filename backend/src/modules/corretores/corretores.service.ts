@@ -54,6 +54,17 @@ function mapCorretor<T extends { _count: { inscricoes: number } }>(c: T) {
 export async function listCorretores(filters: ListCorretoresInput) {
   const { page, limit, skip, take } = resolvePagination(filters)
 
+  // Busca por CPF ignorando pontuação: como o CPF é gravado formatado
+  // (000.000.000-00), casamos os dígitos digitados contra o CPF "só números".
+  const digitos = filters.search?.replace(/\D/g, '') ?? ''
+  let cpfIds: string[] = []
+  if (digitos.length >= 3) {
+    const rows = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM corretores WHERE regexp_replace(cpf, '[^0-9]', '', 'g') LIKE ${'%' + digitos + '%'}
+    `
+    cpfIds = rows.map((r) => r.id)
+  }
+
   const where: Prisma.CorretorWhereInput = {
     ...(filters.status         ? { status: filters.status } : {}),
     ...(filters.imobiliaria_id ? { imobiliaria_id: filters.imobiliaria_id } : {}),
@@ -64,6 +75,7 @@ export async function listCorretores(filters: ListCorretoresInput) {
             { creci: { contains: filters.search, mode: 'insensitive' } },
             { email: { contains: filters.search, mode: 'insensitive' } },
             { cpf:   { contains: filters.search, mode: 'insensitive' } },
+            ...(cpfIds.length ? [{ id: { in: cpfIds } }] : []),
           ],
         }
       : {}),

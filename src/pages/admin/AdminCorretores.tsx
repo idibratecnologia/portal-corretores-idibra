@@ -25,7 +25,7 @@ import type { Corretor, Imobiliaria } from '@/types'
 
 const PAGE_SIZE = 10
 
-type SortFieldC = 'nome' | 'creci' | 'status' | 'cidade' | 'total_eventos'
+type SortFieldC = 'nome' | 'creci' | 'status' | 'cidade'
 type SortDir = 'asc' | 'desc'
 
 function SortTh({ label, field, current, dir, onSort, className }: {
@@ -55,6 +55,7 @@ export function AdminCorretores() {
   const isSuper = adminUser?.nivel === 'super'
   const [isLoading, setIsLoading] = useState(true)
   const [corretores, setCorretores] = useState<Corretor[]>([])
+  const [total, setTotal] = useState(0)
   const [confirmDelete, setConfirmDelete] = useState<Corretor | null>(null)
   const [imobiliarias, setImobiliarias] = useState<Imobiliaria[]>([])
   const [search, setSearch] = useState('')
@@ -67,54 +68,42 @@ export function AdminCorretores() {
   const [sortField, setSortField] = useState<SortFieldC>('nome')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
+  // Imobiliárias (para o filtro) — carregadas uma vez.
+  useEffect(() => { fetchImobiliarias().then(setImobiliarias).catch(() => {}) }, [])
+
+  // Corretores: busca/filtros/ordenação/paginação no servidor.
   const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const [cor, imob] = await Promise.all([
-        fetchCorretores({ limit: 100 }),
-        fetchImobiliarias(),
-      ])
-      setCorretores(cor.data)
-      setImobiliarias(imob)
+      const r = await fetchCorretores({
+        search:         debouncedSearch.trim() || undefined,
+        status:         (statusFilter || undefined) as Corretor['status'] | undefined,
+        imobiliaria_id: imobFilter || undefined,
+        sort:           sortField,
+        order:          sortDir,
+        page,
+        limit:          PAGE_SIZE,
+      })
+      setCorretores(r.data)
+      setTotal(r.meta.total)
     } catch (err) {
       toast({ title: 'Erro ao carregar corretores', description: getErrorMessage(err), variant: 'destructive' })
     } finally {
       setIsLoading(false)
     }
-  }, [toast])
+  }, [debouncedSearch, statusFilter, imobFilter, sortField, sortDir, page, toast])
 
   useEffect(() => { loadData() }, [loadData])
   useRealtimeRefresh(loadData)
+
+  // Ao mudar busca/filtros/ordenação, volta para a primeira página.
+  useEffect(() => { setPage(1) }, [debouncedSearch, statusFilter, imobFilter, sortField, sortDir])
 
   const toggleSort = (field: SortFieldC) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortField(field); setSortDir('asc') }
     setPage(1)
   }
-
-  const filtered = corretores.filter((c) => {
-    const q = debouncedSearch.toLowerCase()
-    const matchSearch =
-      c.nome.toLowerCase().includes(q) ||
-      c.creci.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q)
-    const matchStatus = !statusFilter || c.status === statusFilter
-    const matchImob = !imobFilter || c.imobiliaria_id === imobFilter
-    return matchSearch && matchStatus && matchImob
-  })
-
-  const sorted = [...filtered].sort((a, b) => {
-    const m = sortDir === 'asc' ? 1 : -1
-    switch (sortField) {
-      case 'nome':         return a.nome.localeCompare(b.nome, 'pt-BR') * m
-      case 'creci':        return a.creci.localeCompare(b.creci, 'pt-BR') * m
-      case 'status':       return a.status.localeCompare(b.status, 'pt-BR') * m
-      case 'cidade':       return a.cidade.localeCompare(b.cidade, 'pt-BR') * m
-      case 'total_eventos':return ((a.total_eventos ?? 0) - (b.total_eventos ?? 0)) * m
-      default:             return 0
-    }
-  })
-  const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const handleStatusChange = async (id: string, status: Corretor['status']) => {
     try {
@@ -131,6 +120,7 @@ export function AdminCorretores() {
     try {
       await deleteCorretor(corretor.id)
       setCorretores((prev) => prev.filter((c) => c.id !== corretor.id))
+      setTotal((t) => Math.max(0, t - 1))
       window.dispatchEvent(new Event(PENDING_CHANGED_EVENT))
       toast({ title: 'Corretor excluído', description: corretor.nome })
     } catch (err) {
@@ -173,7 +163,7 @@ export function AdminCorretores() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gestão de Corretores</h1>
-          <p className="text-gray-500 text-sm mt-1">{corretores.length} corretores cadastrados</p>
+          <p className="text-gray-500 text-sm mt-1">{total} corretores cadastrados</p>
         </div>
         <Button
           onClick={() => { setEditingCorretor(null); setModalOpen(true) }}
@@ -219,7 +209,7 @@ export function AdminCorretores() {
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        {!isLoading && filtered.length === 0 ? (
+        {!isLoading && corretores.length === 0 ? (
           <EmptyState
             icon={Users}
             title="Nenhum corretor encontrado"
@@ -233,19 +223,20 @@ export function AdminCorretores() {
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <SortTh label="Nome"    field="nome"          current={sortField} dir={sortDir} onSort={toggleSort} />
                     <SortTh label="CRECI"   field="creci"         current={sortField} dir={sortDir} onSort={toggleSort} className="hidden sm:table-cell" />
+                    <th className="text-left px-4 py-3 font-semibold text-gray-600 hidden md:table-cell">CPF</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-600 hidden md:table-cell">E-mail</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-600 hidden lg:table-cell">Imobiliária</th>
                     <SortTh label="Cidade/UF" field="cidade"      current={sortField} dir={sortDir} onSort={toggleSort} className="hidden xl:table-cell" />
-                    <SortTh label="Eventos" field="total_eventos"  current={sortField} dir={sortDir} onSort={toggleSort} className="hidden sm:table-cell text-center" />
+                    <th className="text-center px-4 py-3 font-semibold text-gray-600 hidden sm:table-cell">Eventos</th>
                     <SortTh label="Status"  field="status"         current={sortField} dir={sortDir} onSort={toggleSort} />
                     <th className="text-right px-4 py-3 font-semibold text-gray-600">Ações</th>
                   </tr>
                 </thead>
                 {isLoading ? (
-                  <SkeletonTable rows={8} cols={8} />
+                  <SkeletonTable rows={8} cols={9} />
                 ) : (
                   <tbody className="divide-y divide-gray-50">
-                    {paginated.map((corretor) => (
+                    {corretores.map((corretor) => (
                       <tr key={corretor.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -261,6 +252,7 @@ export function AdminCorretores() {
                           </div>
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell text-gray-600">{corretor.creci}</td>
+                        <td className="px-4 py-3 hidden md:table-cell text-gray-600">{corretor.cpf || '—'}</td>
                         <td className="px-4 py-3 hidden md:table-cell text-gray-600">{corretor.email}</td>
                         <td className="px-4 py-3 hidden lg:table-cell text-gray-600">
                           {corretor.imobiliaria?.nome || '—'}
@@ -327,7 +319,7 @@ export function AdminCorretores() {
             </div>
             {!isLoading && (
               <TablePagination
-                total={filtered.length}
+                total={total}
                 page={page}
                 pageSize={PAGE_SIZE}
                 onPage={setPage}

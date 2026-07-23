@@ -43,13 +43,17 @@ const schema = z.object({
   creci: z.string().min(1, 'CRECI obrigatório'),
   email: z.string().email('E-mail inválido'),
   whatsapp: z.string().min(14, 'WhatsApp inválido'),
-  imobiliaria_id: z.string().min(1, 'Selecione uma imobiliária'),
+  imobiliaria_id: z.string().optional(),
+  autonomo: z.boolean().optional(),
   cidade: z.string().min(1, 'Cidade obrigatória'),
   uf: z.string().min(2, 'UF obrigatória'),
   instagram: z.string().optional(),
   data_nascimento: z.string().optional(),
   observacoes_admin: z.string().optional(),
   whatsapp_opt_in: z.boolean().optional(),
+}).refine((d) => d.autonomo || !!d.imobiliaria_id, {
+  message: 'Selecione uma imobiliária (ou marque Autônomo)',
+  path: ['imobiliaria_id'],
 })
 
 type FormData = z.infer<typeof schema>
@@ -88,10 +92,12 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
+  const autonomo = watch('autonomo')
 
   useEffect(() => {
     if (corretor) {
@@ -102,6 +108,7 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
         email: corretor.email,
         whatsapp: maskPhone(corretor.whatsapp || ''),
         imobiliaria_id: corretor.imobiliaria_id || '',
+        autonomo: !corretor.imobiliaria_id,
         cidade: corretor.cidade,
         uf: corretor.uf,
         instagram: corretor.instagram || '',
@@ -110,12 +117,18 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
         whatsapp_opt_in: corretor.whatsapp_opt_in ?? false,
       })
     } else {
-      reset({ whatsapp_opt_in: true, uf: 'CE' })   // novo corretor já nasce apto a receber (admin pode desmarcar)
+      reset({ whatsapp_opt_in: true, uf: 'CE', autonomo: false })   // novo corretor já nasce apto a receber (admin pode desmarcar)
     }
   }, [corretor, reset])
 
-  const onSubmit = (data: FormData) =>
-    onSave({ ...data, data_nascimento: data.data_nascimento || null }, foto ?? undefined)
+  const onSubmit = (data: FormData) => {
+    const { autonomo: _autonomo, ...rest } = data
+    onSave({
+      ...rest,
+      imobiliaria_id: data.autonomo ? '' : (data.imobiliaria_id || ''),
+      data_nascimento: data.data_nascimento || null,
+    }, foto ?? undefined)
+  }
 
   function maskedField(
     field: 'cpf' | 'whatsapp',
@@ -195,17 +208,24 @@ export function CorretorModal({ open, onClose, onSave, corretor }: CorretorModal
             </div>
 
             <div className="sm:col-span-2">
-              <Label>Imobiliária *</Label>
+              <div className="flex items-center justify-between">
+                <Label>Imobiliária {autonomo ? '' : '*'}</Label>
+                <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                  <input type="checkbox" {...register('autonomo')} className="w-4 h-4 rounded accent-green-600" />
+                  Autônomo (sem imobiliária)
+                </label>
+              </div>
               <select
                 {...register('imobiliaria_id')}
-                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                disabled={autonomo}
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:bg-gray-50"
               >
-                <option value="">Selecione a imobiliária...</option>
+                <option value="">{autonomo ? 'Autônomo — sem imobiliária' : 'Selecione a imobiliária...'}</option>
                 {imobiliarias.map((i) => (
                   <option key={i.id} value={i.id}>{i.nome}</option>
                 ))}
               </select>
-              {errors.imobiliaria_id && <p className="text-xs text-red-500 mt-1">{errors.imobiliaria_id.message}</p>}
+              {!autonomo && errors.imobiliaria_id && <p className="text-xs text-red-500 mt-1">{errors.imobiliaria_id.message}</p>}
             </div>
 
             <div>

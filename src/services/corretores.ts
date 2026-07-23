@@ -50,12 +50,25 @@ export async function fetchCorretorById(id: string): Promise<Corretor> {
   return api.get<Corretor>(`/corretores/${id}`)
 }
 
-export interface CorretorOpcao { id: string; nome: string; creci: string }
+export interface CorretorOpcao {
+  id: string
+  nome: string
+  creci: string
+  cidade: string
+  uf: string
+  whatsapp: string
+  whatsapp_opt_in: boolean
+  email: string | null
+  email_opt_in: boolean
+  imobiliaria_id: string | null
+  status: Corretor['status']
+  imobiliaria: { nome: string } | null
+}
 
-/** Lista enxuta de todos os corretores ativos (para seletores, sem paginação). */
-export async function fetchCorretoresOpcoes(): Promise<CorretorOpcao[]> {
+/** Lista de corretores para seletores (sem paginação). `status` filtra opcionalmente. */
+export async function fetchCorretoresOpcoes(status?: Corretor['status']): Promise<CorretorOpcao[]> {
   if (USE_MOCK) return []
-  return api.get<CorretorOpcao[]>('/corretores/opcoes')
+  return api.get<CorretorOpcao[]>('/corretores/opcoes', status ? { status } : undefined)
 }
 
 /** Perfil do corretor logado (rota autenticada /corretores/me) */

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { Send, Search, Loader2, Megaphone, Check, AlertTriangle, MessageCircle, Mail, Paperclip, X, CalendarClock, Trash2, Clock } from 'lucide-react'
+import { Send, Search, Loader2, Megaphone, Check, AlertTriangle, MessageCircle, Mail, Paperclip, X, CalendarClock, Trash2, Clock, CalendarCheck } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -9,19 +9,25 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/errors'
-import { fetchCorretores } from '@/services/corretores'
+import { fetchCorretoresOpcoes, type CorretorOpcao } from '@/services/corretores'
 import { fetchImobiliarias } from '@/services/imobiliarias'
+import { fetchEventos } from '@/services/eventos'
+import { fetchInscricoesByEvento } from '@/services/inscricoes'
 import { dispararEmMassa } from '@/services/whatsapp'
 import { agendarDisparo, fetchDisparosAgendados, cancelarDisparoAgendado, type DisparoAgendado } from '@/services/disparosAgendados'
 import { ModelosMensagemBar } from '@/components/admin/ModelosMensagemBar'
 import { formatDateTime } from '@/lib/utils'
-import type { Corretor, Imobiliaria } from '@/types'
+import type { Imobiliaria, Evento } from '@/types'
 
 export function AdminDisparos() {
   const { toast } = useToast()
-  const [corretores, setCorretores] = useState<Corretor[]>([])
+  const [corretores, setCorretores] = useState<CorretorOpcao[]>([])
   const [imobiliarias, setImobiliarias] = useState<Imobiliaria[]>([])
   const [loading, setLoading] = useState(true)
+  // Selecionar público por evento (pós-evento)
+  const [eventos, setEventos] = useState<Evento[]>([])
+  const [eventoSel, setEventoSel] = useState('')
+  const [carregandoPublico, setCarregandoPublico] = useState(false)
   const [mensagem, setMensagem] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirmar, setConfirmar] = useState(false)
@@ -46,11 +52,31 @@ export function AdminDisparos() {
   const [fOptIn, setFOptIn] = useState(true)
 
   useEffect(() => {
-    Promise.all([fetchCorretores({ limit: 1000 }), fetchImobiliarias()])
-      .then(([c, i]) => { setCorretores(c.data); setImobiliarias(i) })
-      .catch((err) => toast({ title: 'Erro ao carregar corretores', description: getErrorMessage(err), variant: 'destructive' }))
+    Promise.all([fetchCorretoresOpcoes(), fetchImobiliarias(), fetchEventos({ limit: 100 })])
+      .then(([c, i, ev]) => { setCorretores(c); setImobiliarias(i); setEventos(ev.data) })
+      .catch((err) => toast({ title: 'Erro ao carregar dados', description: getErrorMessage(err), variant: 'destructive' }))
       .finally(() => setLoading(false))
   }, [toast])
+
+  // Seleciona os corretores de um evento por status (presentes/inscritos/ausentes)
+  const selecionarPorEvento = async (status: 'presente' | 'inscrito' | 'ausente') => {
+    if (!eventoSel) return
+    setCarregandoPublico(true)
+    try {
+      const inscricoes = await fetchInscricoesByEvento(eventoSel)
+      const ids = inscricoes.filter((i) => i.status === status).map((i) => i.corretor?.id).filter((v): v is string => !!v)
+      if (ids.length === 0) {
+        toast({ title: 'Nenhum corretor', description: `Este evento não tem ${status === 'presente' ? 'presentes' : status === 'ausente' ? 'ausentes' : 'inscritos'}.` })
+        return
+      }
+      setSelected((prev) => { const n = new Set(prev); ids.forEach((id) => n.add(id)); return n })
+      toast({ title: 'Público adicionado', description: `${ids.length} corretor(es) adicionados à seleção.` })
+    } catch (err) {
+      toast({ title: 'Erro ao carregar público', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setCarregandoPublico(false)
+    }
+  }
 
   const carregarAgendados = useCallback(() => {
     fetchDisparosAgendados().then(setAgendados).catch(() => {})
@@ -217,6 +243,24 @@ export function AdminDisparos() {
               {anexoGrandeEmail && <p className="text-[11px] text-amber-600 mt-1">Anexo &gt; 3 MB pode falhar no e-mail (limite do Outlook). No WhatsApp vai normalmente.</p>}
               {anexo && <p className="text-[10px] text-gray-400 mt-1">No WhatsApp, imagens vão como foto e os demais como documento; a mensagem vira a legenda.</p>}
             </div>
+          </div>
+
+          {/* Selecionar público de um evento (pós-evento) */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-3">
+            <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5"><CalendarCheck className="w-4 h-4 text-green-600" /> Selecionar público de um evento</p>
+            <p className="text-xs text-gray-400 -mt-1">Ex.: mensagem pós-evento para quem esteve presente.</p>
+            <select value={eventoSel} onChange={(e) => setEventoSel(e.target.value)} className="h-9 w-full rounded-md border border-gray-200 px-2 text-sm">
+              <option value="">Selecione um evento…</option>
+              {eventos.map((ev) => <option key={ev.id} value={ev.id}>{ev.titulo}</option>)}
+            </select>
+            {eventoSel && (
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => selecionarPorEvento('presente')} disabled={carregandoPublico} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50">+ Presentes</button>
+                <button onClick={() => selecionarPorEvento('inscrito')} disabled={carregandoPublico} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50">+ Inscritos</button>
+                <button onClick={() => selecionarPorEvento('ausente')} disabled={carregandoPublico} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50">+ Ausentes</button>
+                {carregandoPublico && <Loader2 className="w-4 h-4 animate-spin text-green-600 self-center" />}
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">

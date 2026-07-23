@@ -1,7 +1,7 @@
 /**
  * Lógica de negócio dos corretores.
  */
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { NotFoundError, ConflictError } from '@/lib/errors'
 import { hashPassword } from '@/lib/hash'
@@ -54,52 +54,65 @@ function mapCorretor<T extends { _count: { inscricoes: number } }>(c: T) {
 export async function listCorretores(filters: ListCorretoresInput) {
   const { page, limit, skip, take } = resolvePagination(filters)
 
-  // Busca por CPF ignorando pontuação: como o CPF é gravado formatado
-  // (000.000.000-00), casamos os dígitos digitados contra o CPF "só números".
-  const digitos = filters.search?.replace(/\D/g, '') ?? ''
-  let cpfIds: string[] = []
-  if (digitos.length >= 3) {
-    const rows = await prisma.$queryRaw<{ id: string }[]>`
-      SELECT id FROM corretores WHERE regexp_replace(cpf, '[^0-9]', '', 'g') LIKE ${'%' + digitos + '%'}
-    `
-    cpfIds = rows.map((r) => r.id)
+  // WHERE em SQL (permite ordenar por lower() e buscar CPF ignorando pontuação).
+  const conds: Prisma.Sql[] = []
+  if (filters.status)         conds.push(Prisma.sql`status = ${filters.status}`)
+  if (filters.imobiliaria_id) conds.push(Prisma.sql`imobiliaria_id = ${filters.imobiliaria_id}::uuid`)
+  if (filters.search) {
+    const like = `%${filters.search}%`
+    const partes: Prisma.Sql[] = [
+      Prisma.sql`nome ILIKE ${like}`,
+      Prisma.sql`creci ILIKE ${like}`,
+      Prisma.sql`email ILIKE ${like}`,
+      Prisma.sql`cpf ILIKE ${like}`,
+    ]
+    const digitos = filters.search.replace(/\D/g, '')
+    if (digitos.length >= 3) partes.push(Prisma.sql`regexp_replace(cpf, '[^0-9]', '', 'g') LIKE ${'%' + digitos + '%'}`)
+    conds.push(Prisma.sql`(${Prisma.join(partes, ' OR ')})`)
   }
+  const whereSql = conds.length ? Prisma.sql`WHERE ${Prisma.join(conds, ' AND ')}` : Prisma.empty
 
-  const where: Prisma.CorretorWhereInput = {
-    ...(filters.status         ? { status: filters.status } : {}),
-    ...(filters.imobiliaria_id ? { imobiliaria_id: filters.imobiliaria_id } : {}),
-    ...(filters.search
-      ? {
-          OR: [
-            { nome:  { contains: filters.search, mode: 'insensitive' } },
-            { creci: { contains: filters.search, mode: 'insensitive' } },
-            { email: { contains: filters.search, mode: 'insensitive' } },
-            { cpf:   { contains: filters.search, mode: 'insensitive' } },
-            ...(cpfIds.length ? [{ id: { in: cpfIds } }] : []),
-          ],
-        }
-      : {}),
+  // ORDER — texto ordenado por lower() para ficar em ordem alfabética real
+  // (independe de MAIÚSCULAS/minúsculas). Demais campos, ordem natural.
+  const ORDER_COL: Record<string, Prisma.Sql> = {
+    nome:       Prisma.sql`lower(trim(nome))`,
+    creci:      Prisma.sql`creci`,
+    status:     Prisma.sql`status`,
+    cidade:     Prisma.sql`lower(trim(cidade))`,
+    created_at: Prisma.sql`created_at`,
   }
+  const orderCol = ORDER_COL[filters.sort ?? 'nome'] ?? Prisma.sql`lower(trim(nome))`
+  const orderDir = filters.order === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`
 
-  const orderBy: Prisma.CorretorOrderByWithRelationInput = filters.sort
-    ? { [filters.sort]: filters.order ?? 'asc' }
-    : { nome: 'asc' }
+  const idRows = await prisma.$queryRaw<{ id: string }[]>(
+    Prisma.sql`SELECT id FROM corretores ${whereSql} ORDER BY ${orderCol} ${orderDir} LIMIT ${take} OFFSET ${skip}`,
+  )
+  const countRows = await prisma.$queryRaw<{ count: bigint }[]>(
+    Prisma.sql`SELECT count(*)::bigint AS count FROM corretores ${whereSql}`,
+  )
+  const total = Number(countRows[0]?.count ?? 0)
+  const ids = idRows.map((r) => r.id)
 
-  const [rows, total] = await Promise.all([
-    prisma.corretor.findMany({ where, orderBy, skip, take, select: corretorSelect }),
-    prisma.corretor.count({ where }),
-  ])
+  const rows = await prisma.corretor.findMany({ where: { id: { in: ids } }, select: corretorSelect })
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  const ordenados = ids.map((id) => byId.get(id)).filter((r): r is NonNullable<typeof r> => !!r)
 
-  return buildPaginated(rows.map(mapCorretor), total, page, limit)
+  return buildPaginated(ordenados.map(mapCorretor), total, page, limit)
 }
 
-/** Lista enxuta de todos os corretores ativos (para seletores, sem paginação). */
-export async function listCorretoresOpcoes() {
-  return prisma.corretor.findMany({
-    where:   { status: 'ativo' },
-    select:  { id: true, nome: true, creci: true },
-    orderBy: { nome: 'asc' },
+/** Lista (sem paginação) de corretores para seletores — disparos, convidados, etc. */
+export async function listCorretoresOpcoes(status?: 'pendente' | 'ativo' | 'bloqueado') {
+  const rows = await prisma.corretor.findMany({
+    where: status ? { status } : {},
+    select: {
+      id: true, nome: true, creci: true, cidade: true, uf: true,
+      whatsapp: true, whatsapp_opt_in: true, email: true, email_opt_in: true,
+      imobiliaria_id: true, status: true,
+      imobiliaria: { select: { nome: true } },
+    },
   })
+  // Ordena em ordem alfabética real (ignora MAIÚSCULAS/acentos/espaços nas pontas).
+  return rows.sort((a, b) => a.nome.trim().localeCompare(b.nome.trim(), 'pt-BR', { sensitivity: 'base' }))
 }
 
 // ─── Detalhe ──────────────────────────────────────────────────────
@@ -129,7 +142,7 @@ export async function createCorretor(input: CreateCorretorInput) {
 
   const corretor = await prisma.corretor.create({
     data: {
-      nome:            input.nome,
+      nome:            input.nome.trim(),
       cpf:             input.cpf,
       creci:           input.creci,
       email:           input.email,
@@ -139,7 +152,7 @@ export async function createCorretor(input: CreateCorretorInput) {
       whatsapp_opt_in: input.whatsapp_opt_in ?? false,
       instagram:       input.instagram,
       data_nascimento: input.data_nascimento ?? null,
-      cidade:          input.cidade,
+      cidade:          input.cidade.trim(),
       uf:              input.uf.toUpperCase(),
       imobiliaria_id:  input.imobiliaria_id,
       observacoes_admin: input.observacoes_admin,
@@ -183,6 +196,8 @@ export async function updateCorretor(id: string, input: UpdateCorretorInput) {
     where: { id },
     data: {
       ...input,
+      nome: input.nome ? input.nome.trim() : undefined,
+      cidade: input.cidade ? input.cidade.trim() : undefined,
       uf: input.uf ? input.uf.toUpperCase() : undefined,
       // telefone é legado: mantém sincronizado com o WhatsApp
       telefone: input.telefone || input.whatsapp || undefined,

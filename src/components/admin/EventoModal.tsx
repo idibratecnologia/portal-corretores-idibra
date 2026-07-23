@@ -115,7 +115,7 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
   // Carrega TODOS os corretores ativos para a seleção de convidados (sem paginação)
   useEffect(() => {
     if (open) {
-      fetchCorretoresOpcoes()
+      fetchCorretoresOpcoes('ativo')
         .then(setCorretores)
         .catch(() => setCorretores([]))
     }

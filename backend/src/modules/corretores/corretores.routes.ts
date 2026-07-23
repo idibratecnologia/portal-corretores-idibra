@@ -68,9 +68,10 @@ export async function corretoresRoutes(app: FastifyInstance) {
     return reply.send(await service.listCorretores(filters))
   })
 
-  // Lista enxuta de TODOS os corretores ativos (para seletores, sem paginação)
-  app.get('/opcoes', { preHandler: [authenticate, requireAdmin] }, async (_req, reply) => {
-    return reply.send(await service.listCorretoresOpcoes())
+  // Lista (sem paginação) de corretores para seletores — ?status filtra
+  app.get('/opcoes', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
+    const { status } = z.object({ status: z.enum(['pendente', 'ativo', 'bloqueado']).optional() }).parse(req.query)
+    return reply.send(await service.listCorretoresOpcoes(status))
   })
 
   app.get('/:id', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {

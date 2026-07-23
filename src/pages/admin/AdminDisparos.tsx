@@ -7,6 +7,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/errors'
 import { fetchCorretoresOpcoes, type CorretorOpcao } from '@/services/corretores'
@@ -27,7 +28,11 @@ export function AdminDisparos() {
   // Selecionar público por evento (pós-evento)
   const [eventos, setEventos] = useState<Evento[]>([])
   const [eventoSel, setEventoSel] = useState('')
-  const [carregandoPublico, setCarregandoPublico] = useState(false)
+  interface PublicoItem { id: string; nome: string; creci: string; checkin_at: string | null }
+  const [publico, setPublico] = useState<{
+    open: boolean; status: 'presente' | 'inscrito' | 'ausente'; loading: boolean
+    itens: PublicoItem[]; checked: Set<string>
+  }>({ open: false, status: 'presente', loading: false, itens: [], checked: new Set() })
   const [mensagem, setMensagem] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirmar, setConfirmar] = useState(false)
@@ -58,24 +63,30 @@ export function AdminDisparos() {
       .finally(() => setLoading(false))
   }, [toast])
 
-  // Seleciona os corretores de um evento por status (presentes/inscritos/ausentes)
-  const selecionarPorEvento = async (status: 'presente' | 'inscrito' | 'ausente') => {
+  // Abre a janela com os participantes do evento (por status) para revisar antes de adicionar
+  const STATUS_PUBLICO_LABEL = { presente: 'Presentes', inscrito: 'Inscritos', ausente: 'Ausentes' } as const
+  const abrirPublico = async (status: 'presente' | 'inscrito' | 'ausente') => {
     if (!eventoSel) return
-    setCarregandoPublico(true)
+    setPublico({ open: true, status, loading: true, itens: [], checked: new Set() })
     try {
       const inscricoes = await fetchInscricoesByEvento(eventoSel)
-      const ids = inscricoes.filter((i) => i.status === status).map((i) => i.corretor?.id).filter((v): v is string => !!v)
-      if (ids.length === 0) {
-        toast({ title: 'Nenhum corretor', description: `Este evento não tem ${status === 'presente' ? 'presentes' : status === 'ausente' ? 'ausentes' : 'inscritos'}.` })
-        return
-      }
-      setSelected((prev) => { const n = new Set(prev); ids.forEach((id) => n.add(id)); return n })
-      toast({ title: 'Público adicionado', description: `${ids.length} corretor(es) adicionados à seleção.` })
+      const itens: PublicoItem[] = inscricoes
+        .filter((i) => i.status === status && i.corretor)
+        .map((i) => ({ id: i.corretor!.id, nome: i.corretor!.nome, creci: i.corretor!.creci, checkin_at: i.checkin_at ?? null }))
+      setPublico((p) => ({ ...p, loading: false, itens, checked: new Set(itens.map((i) => i.id)) }))
     } catch (err) {
       toast({ title: 'Erro ao carregar público', description: getErrorMessage(err), variant: 'destructive' })
-    } finally {
-      setCarregandoPublico(false)
+      setPublico((p) => ({ ...p, open: false, loading: false }))
     }
+  }
+  const togglePublicoItem = (id: string) =>
+    setPublico((p) => { const n = new Set(p.checked); n.has(id) ? n.delete(id) : n.add(id); return { ...p, checked: n } })
+  const togglePublicoTodos = () =>
+    setPublico((p) => ({ ...p, checked: p.checked.size === p.itens.length ? new Set() : new Set(p.itens.map((i) => i.id)) }))
+  const adicionarPublico = () => {
+    setSelected((prev) => { const n = new Set(prev); publico.checked.forEach((id) => n.add(id)); return n })
+    toast({ title: 'Público adicionado', description: `${publico.checked.size} corretor(es) adicionados à seleção.` })
+    setPublico((p) => ({ ...p, open: false }))
   }
 
   const carregarAgendados = useCallback(() => {
@@ -255,10 +266,9 @@ export function AdminDisparos() {
             </select>
             {eventoSel && (
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => selecionarPorEvento('presente')} disabled={carregandoPublico} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50">+ Presentes</button>
-                <button onClick={() => selecionarPorEvento('inscrito')} disabled={carregandoPublico} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50">+ Inscritos</button>
-                <button onClick={() => selecionarPorEvento('ausente')} disabled={carregandoPublico} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50">+ Ausentes</button>
-                {carregandoPublico && <Loader2 className="w-4 h-4 animate-spin text-green-600 self-center" />}
+                <button onClick={() => abrirPublico('presente')} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100">Ver presentes</button>
+                <button onClick={() => abrirPublico('inscrito')} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100">Ver inscritos</button>
+                <button onClick={() => abrirPublico('ausente')} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100">Ver ausentes</button>
               </div>
             )}
           </div>
@@ -418,6 +428,49 @@ export function AdminDisparos() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Participantes do evento (revisar antes de adicionar) */}
+      <Dialog open={publico.open} onOpenChange={(o) => { if (!o) setPublico((p) => ({ ...p, open: false })) }}>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2"><CalendarCheck className="w-5 h-5 text-green-600" /> {STATUS_PUBLICO_LABEL[publico.status]} do evento</DialogTitle>
+            <DialogDescription>{eventos.find((e) => e.id === eventoSel)?.titulo ?? ''}</DialogDescription>
+          </DialogHeader>
+
+          {publico.loading ? (
+            <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 text-green-600 animate-spin" /></div>
+          ) : publico.itens.length === 0 ? (
+            <p className="py-10 text-center text-sm text-gray-400">Nenhum corretor com esse status neste evento.</p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between flex-shrink-0">
+                <button onClick={togglePublicoTodos} className="text-xs font-semibold text-green-700 hover:text-green-800 inline-flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5" /> {publico.checked.size === publico.itens.length ? 'Desmarcar' : 'Selecionar'} todos
+                </button>
+                <span className="text-xs text-gray-400">{publico.checked.size} de {publico.itens.length}</span>
+              </div>
+              <div className="mt-2 flex-1 min-h-0 overflow-y-auto rounded-xl border border-gray-100 divide-y divide-gray-50">
+                {publico.itens.map((it) => (
+                  <label key={it.id} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50">
+                    <input type="checkbox" checked={publico.checked.has(it.id)} onChange={() => togglePublicoItem(it.id)} className="w-4 h-4 rounded accent-green-600" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{it.nome}</p>
+                      <p className="text-[11px] text-gray-400">{it.creci}{it.checkin_at ? ` · check-in ${formatDateTime(it.checkin_at)}` : ''}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+
+          <DialogFooter className="flex-shrink-0">
+            <Button variant="outline" onClick={() => setPublico((p) => ({ ...p, open: false }))} className="rounded-xl">Cancelar</Button>
+            <Button onClick={adicionarPublico} disabled={publico.checked.size === 0} className="rounded-xl bg-green-700 hover:bg-green-800 gap-1.5">
+              <Check className="w-4 h-4" /> Adicionar {publico.checked.size} à seleção
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -98,6 +98,7 @@ export function CadastroPage() {
     if (!form.creci.trim())                     errs.creci     = 'CRECI obrigatório'
     if (!form.email.includes('@'))              errs.email     = 'E-mail inválido'
     if (form.whatsapp.replace(/\D/g,'').length < 10) errs.whatsapp = 'WhatsApp inválido'
+    if (!form.autonomo && !form.imobiliaria_id) errs.imobiliaria_id = 'Selecione uma imobiliária (ou marque autônomo)'
     if (!form.cidade.trim())                    errs.cidade    = 'Cidade obrigatória'
     if (!form.data_nascimento) {
       errs.data_nascimento = 'Data de nascimento obrigatória'
@@ -268,18 +269,22 @@ export function CadastroPage() {
                   value={form.imobiliaria_id}
                   onChange={set('imobiliaria_id')}
                   disabled={form.autonomo}
-                  className={`${inputCls} text-gray-600 disabled:opacity-50`}
+                  className={`${inputCls} text-gray-600 disabled:opacity-50 ${fieldErrors.imobiliaria_id ? 'border-red-300' : ''}`}
                 >
-                  <option value="">{form.autonomo ? 'Autônomo — sem imobiliária' : 'Imobiliária (opcional)'}</option>
+                  <option value="">{form.autonomo ? 'Autônomo — sem imobiliária' : 'Selecione a imobiliária *'}</option>
                   {imobiliarias.map((i) => (
                     <option key={i.id} value={i.id}>{i.nome}</option>
                   ))}
                 </select>
+                {!form.autonomo && fieldErrors.imobiliaria_id && <p className="text-xs text-red-500 mt-1 pl-1">{fieldErrors.imobiliaria_id}</p>}
                 <label className="flex items-center gap-2 text-xs text-gray-600 mt-2 pl-1 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.autonomo}
-                    onChange={(e) => setForm((prev) => ({ ...prev, autonomo: e.target.checked, imobiliaria_id: e.target.checked ? '' : prev.imobiliaria_id }))}
+                    onChange={(e) => {
+                      setForm((prev) => ({ ...prev, autonomo: e.target.checked, imobiliaria_id: e.target.checked ? '' : prev.imobiliaria_id }))
+                      if (fieldErrors.imobiliaria_id) setFieldErrors((prev) => { const n = { ...prev }; delete n.imobiliaria_id; return n })
+                    }}
                     className="w-4 h-4 rounded accent-green-600 flex-shrink-0"
                   />
                   Sou autônomo (sem imobiliária)

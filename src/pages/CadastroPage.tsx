@@ -77,7 +77,7 @@ export function CadastroPage() {
   const [form, setForm] = useState({
     nome: '', cpf: '', creci: '', email: '',
     whatsapp: '', instagram: '',
-    imobiliaria_id: '', cidade: '', uf: 'CE',
+    imobiliaria_id: '', autonomo: false, cidade: '', uf: 'CE',
     data_nascimento: '',
     password: '', confirmPassword: '',
     whatsapp_opt_in: true,   // consentimento LGPD para receber notificações
@@ -189,7 +189,7 @@ export function CadastroPage() {
                 <Building2 className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-gray-900 leading-tight">Solicitar cadastro</h1>
+                <h1 className="text-lg font-bold text-gray-900 leading-tight">Realize seu cadastro</h1>
                 <p className="text-xs text-gray-400">Preencha seus dados de corretor</p>
               </div>
             </div>
@@ -262,17 +262,29 @@ export function CadastroPage() {
                 onChange={set('instagram')}
               />
 
-              {/* Imobiliária */}
-              <select
-                value={form.imobiliaria_id}
-                onChange={set('imobiliaria_id')}
-                className={`${inputCls} text-gray-600`}
-              >
-                <option value="">Imobiliária (opcional)</option>
-                {imobiliarias.map((i) => (
-                  <option key={i.id} value={i.id}>{i.nome}</option>
-                ))}
-              </select>
+              {/* Imobiliária + autônomo */}
+              <div>
+                <select
+                  value={form.imobiliaria_id}
+                  onChange={set('imobiliaria_id')}
+                  disabled={form.autonomo}
+                  className={`${inputCls} text-gray-600 disabled:opacity-50`}
+                >
+                  <option value="">{form.autonomo ? 'Autônomo — sem imobiliária' : 'Imobiliária (opcional)'}</option>
+                  {imobiliarias.map((i) => (
+                    <option key={i.id} value={i.id}>{i.nome}</option>
+                  ))}
+                </select>
+                <label className="flex items-center gap-2 text-xs text-gray-600 mt-2 pl-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.autonomo}
+                    onChange={(e) => setForm((prev) => ({ ...prev, autonomo: e.target.checked, imobiliaria_id: e.target.checked ? '' : prev.imobiliaria_id }))}
+                    className="w-4 h-4 rounded accent-green-600 flex-shrink-0"
+                  />
+                  Sou autônomo (sem imobiliária)
+                </label>
+              </div>
 
               {/* Cidade + UF */}
               <div className="grid grid-cols-3 gap-2">

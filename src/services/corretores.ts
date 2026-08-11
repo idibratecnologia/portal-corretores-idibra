@@ -7,8 +7,11 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
 // ─── Types ───────────────────────────────────────────────────────
 
+export type CorretorSearchField = 'nome' | 'cpf' | 'creci' | 'email' | 'imobiliaria'
+
 export interface CorretorFilters {
   search?:         string
+  campo?:          CorretorSearchField
   status?:         Corretor['status'] | ''
   imobiliaria_id?: string
   page?:           number

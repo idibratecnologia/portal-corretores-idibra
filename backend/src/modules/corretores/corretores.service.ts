@@ -60,15 +60,21 @@ export async function listCorretores(filters: ListCorretoresInput) {
   if (filters.imobiliaria_id) conds.push(Prisma.sql`imobiliaria_id = ${filters.imobiliaria_id}::uuid`)
   if (filters.search) {
     const like = `%${filters.search}%`
-    const partes: Prisma.Sql[] = [
-      Prisma.sql`nome ILIKE ${like}`,
-      Prisma.sql`creci ILIKE ${like}`,
-      Prisma.sql`email ILIKE ${like}`,
-      Prisma.sql`cpf ILIKE ${like}`,
-    ]
     const digitos = filters.search.replace(/\D/g, '')
-    if (digitos.length >= 3) partes.push(Prisma.sql`regexp_replace(cpf, '[^0-9]', '', 'g') LIKE ${'%' + digitos + '%'}`)
-    conds.push(Prisma.sql`(${Prisma.join(partes, ' OR ')})`)
+    // Busca por CPF ignora pontuação (o CPF é gravado formatado).
+    const cpfSql = digitos.length >= 3
+      ? Prisma.sql`(cpf ILIKE ${like} OR regexp_replace(cpf, '[^0-9]', '', 'g') LIKE ${'%' + digitos + '%'})`
+      : Prisma.sql`cpf ILIKE ${like}`
+    const imobSql = Prisma.sql`imobiliaria_id IN (SELECT id FROM imobiliarias WHERE nome ILIKE ${like})`
+
+    switch (filters.campo) {
+      case 'nome':        conds.push(Prisma.sql`nome ILIKE ${like}`); break
+      case 'creci':       conds.push(Prisma.sql`creci ILIKE ${like}`); break
+      case 'email':       conds.push(Prisma.sql`email ILIKE ${like}`); break
+      case 'cpf':         conds.push(cpfSql); break
+      case 'imobiliaria': conds.push(imobSql); break
+      default:            conds.push(Prisma.sql`(nome ILIKE ${like} OR creci ILIKE ${like} OR email ILIKE ${like} OR ${cpfSql} OR ${imobSql})`)
+    }
   }
   const whereSql = conds.length ? Prisma.sql`WHERE ${Prisma.join(conds, ' AND ')}` : Prisma.empty
 

@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { fetchCorretores, createCorretor, updateCorretor, setCorretorStatus, deleteCorretor, uploadFotoCorretor } from '@/services/corretores'
+import { fetchCorretores, createCorretor, updateCorretor, setCorretorStatus, deleteCorretor, uploadFotoCorretor, type CorretorSearchField } from '@/services/corretores'
 import { fetchImobiliarias } from '@/services/imobiliarias'
 import { PENDING_CHANGED_EVENT } from '@/components/admin/AdminSidebar'
 import { useAuth } from '@/contexts/AuthContext'
@@ -59,6 +59,7 @@ export function AdminCorretores() {
   const [confirmDelete, setConfirmDelete] = useState<Corretor | null>(null)
   const [imobiliarias, setImobiliarias] = useState<Imobiliaria[]>([])
   const [search, setSearch] = useState('')
+  const [campo, setCampo] = useState<CorretorSearchField | ''>('')
   const debouncedSearch = useDebouncedValue(search)
   const [statusFilter, setStatusFilter] = useState('')
   const [imobFilter, setImobFilter] = useState('')
@@ -77,6 +78,7 @@ export function AdminCorretores() {
     try {
       const r = await fetchCorretores({
         search:         debouncedSearch.trim() || undefined,
+        campo:          campo || undefined,
         status:         (statusFilter || undefined) as Corretor['status'] | undefined,
         imobiliaria_id: imobFilter || undefined,
         sort:           sortField,
@@ -91,13 +93,13 @@ export function AdminCorretores() {
     } finally {
       setIsLoading(false)
     }
-  }, [debouncedSearch, statusFilter, imobFilter, sortField, sortDir, page, toast])
+  }, [debouncedSearch, campo, statusFilter, imobFilter, sortField, sortDir, page, toast])
 
   useEffect(() => { loadData() }, [loadData])
   useRealtimeRefresh(loadData)
 
   // Ao mudar busca/filtros/ordenação, volta para a primeira página.
-  useEffect(() => { setPage(1) }, [debouncedSearch, statusFilter, imobFilter, sortField, sortDir])
+  useEffect(() => { setPage(1) }, [debouncedSearch, campo, statusFilter, imobFilter, sortField, sortDir])
 
   const toggleSort = (field: SortFieldC) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -176,10 +178,25 @@ export function AdminCorretores() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
+        <select
+          value={campo}
+          onChange={(e) => { setCampo(e.target.value as CorretorSearchField | ''); setPage(1) }}
+          className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-400 text-gray-700 sm:w-40 flex-shrink-0"
+          title="Escolha por qual campo buscar"
+        >
+          <option value="">Buscar por: Tudo</option>
+          <option value="nome">Nome</option>
+          <option value="cpf">CPF</option>
+          <option value="creci">CRECI</option>
+          <option value="email">E-mail</option>
+          <option value="imobiliaria">Imobiliária</option>
+        </select>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Buscar por nome, CPF, CRECI ou e-mail..."
+            placeholder={campo
+              ? `Buscar por ${({ nome: 'nome', cpf: 'CPF', creci: 'CRECI', email: 'e-mail', imobiliaria: 'imobiliária' } as const)[campo]}…`
+              : 'Buscar por nome, CPF, CRECI, e-mail ou imobiliária...'}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="pl-9"

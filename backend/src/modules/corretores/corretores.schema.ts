@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 export const listCorretoresSchema = z.object({
   search:         z.string().optional(),
+  campo:          z.enum(['nome', 'cpf', 'creci', 'email', 'imobiliaria']).optional(),
   status:         z.enum(['pendente', 'ativo', 'bloqueado']).optional(),
   imobiliaria_id: z.string().uuid().optional(),
   page:           z.coerce.number().int().positive().optional(),

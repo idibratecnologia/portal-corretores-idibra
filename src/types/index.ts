@@ -76,6 +76,7 @@ export interface Evento {
   certificados_enviados_em?: string | null
   exclusivo?: boolean
   convidados_ids?: string[]
+  link_exclusivo?: string | null
   criado_por?: string
   created_at: string
   updated_at: string

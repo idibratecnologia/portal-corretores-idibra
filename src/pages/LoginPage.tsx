@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import idibraLogo from '@/assets/idibra_logo.png'
 import idibraLogoPreta from '@/assets/idibra_logo_preta.png'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, Lock, Mail, ArrowRight, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -14,6 +14,8 @@ const benefits = [
 export function LoginPage() {
   const { login, loading, authError, clearAuthError } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const redirect = searchParams.get('redirect')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [showPwd, setShowPwd]   = useState(false)
@@ -22,8 +24,10 @@ export function LoginPage() {
     e.preventDefault()
     clearAuthError()
     const role = await login(email, password)
-    if (role === 'admin')         navigate('/admin/dashboard', { replace: true })
-    else if (role === 'corretor') navigate('/portal/home',      { replace: true })
+    // Volta para a página de origem (ex.: link de convite) quando houver redirect
+    if (role === 'corretor' && redirect) navigate(redirect, { replace: true })
+    else if (role === 'admin')           navigate('/admin/dashboard', { replace: true })
+    else if (role === 'corretor')        navigate('/portal/home',      { replace: true })
   }
 
   return (

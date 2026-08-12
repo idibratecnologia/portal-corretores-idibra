@@ -11,7 +11,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import * as service from './eventos.service'
 import { listEventosSchema, createEventoSchema, updateEventoSchema, statusEventoSchema } from './eventos.schema'
-import { authenticate, requireAdmin, requireSuperAdmin } from '@/middlewares/auth.middleware'
+import { authenticate, requireAdmin, requireSuperAdmin, requireCorretor } from '@/middlewares/auth.middleware'
 import { readImageUpload } from '@/lib/upload'
 import { audit } from '@/lib/audit'
 
@@ -33,6 +33,13 @@ export async function eventosRoutes(app: FastifyInstance) {
     const { id } = idParam.parse(req.params)
     const corretorId = req.user!.role === 'corretor' ? req.user!.sub : undefined
     return reply.send(await service.getEventoById(id, corretorId))
+  })
+
+  // Corretor entra no evento exclusivo pelo link de convite (auto-convida)
+  app.post('/:id/entrar', { preHandler: [authenticate, requireCorretor] }, async (req, reply) => {
+    const { id } = idParam.parse(req.params)
+    const { token } = z.object({ token: z.string().min(10) }).parse(req.body)
+    return reply.send(await service.entrarPorLink(id, req.user!.sub, token))
   })
 
   // ── Mutações (admin) ──────────────────────────────────────────

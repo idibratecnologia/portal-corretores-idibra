@@ -11,6 +11,7 @@ import { renderMensagem } from '@/modules/templates/templates.service'
 import { emitAdminRefresh } from '@/lib/events'
 import { formatDataEvento } from '@/lib/format'
 import { config } from '@/config'
+import { urlEventoExclusivo, tokenEventoValido } from '@/lib/evento-token'
 import type { ListEventosInput, CreateEventoInput, UpdateEventoInput } from './eventos.schema'
 
 /** Adiciona total_inscritos e total_presentes a partir das inscrições. */
@@ -82,8 +83,43 @@ export async function getEventoById(id: string, corretorId?: string) {
 
   const { convidados, ...rest } = evento
   const base = await withContagens(rest)
-  // Lista de convidados só é exposta ao admin (corretorId indefinido)
-  return corretorId ? base : { ...base, convidados_ids: convidados.map((c) => c.corretor_id) }
+  // Lista de convidados + link de convite só são expostos ao admin (corretorId indefinido)
+  if (corretorId) return base
+  return {
+    ...base,
+    convidados_ids: convidados.map((c) => c.corretor_id),
+    link_exclusivo: evento.exclusivo ? urlEventoExclusivo(evento.id) : null,
+  }
+}
+
+/** Info mínima do evento a partir do link de convite (token). Ignora a "invisibilidade". */
+export async function getEventoPorLink(id: string, token: string) {
+  if (!tokenEventoValido(id, token)) throw new NotFoundError('Link inválido ou expirado')
+  const ev = await prisma.evento.findUnique({
+    where: { id },
+    select: {
+      id: true, titulo: true, descricao: true, banner_url: true, tipo: true,
+      data_evento: true, hora_inicio: true, hora_fim: true, local: true, endereco: true,
+      status: true, exclusivo: true,
+    },
+  })
+  if (!ev || !ev.exclusivo) throw new NotFoundError('Evento não encontrado')
+  return ev
+}
+
+/** Corretor entra no evento pelo link de convite: valida o token e se auto-convida. */
+export async function entrarPorLink(eventoId: string, corretorId: string, token: string) {
+  if (!tokenEventoValido(eventoId, token)) throw new BadRequestError('Link inválido ou expirado')
+  const ev = await prisma.evento.findUnique({ where: { id: eventoId }, select: { exclusivo: true, status: true } })
+  if (!ev) throw new NotFoundError('Evento não encontrado')
+  if (ev.exclusivo) {
+    await prisma.eventoConvidado.upsert({
+      where:  { evento_id_corretor_id: { evento_id: eventoId, corretor_id: corretorId } },
+      update: {},
+      create: { evento_id: eventoId, corretor_id: corretorId },
+    })
+  }
+  return { ok: true, evento_id: eventoId }
 }
 
 // ─── Página pública (compartilhamento, sem login) ────────────────

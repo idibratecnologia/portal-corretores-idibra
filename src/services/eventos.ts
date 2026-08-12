@@ -124,6 +124,33 @@ export async function deleteEvento(id: string): Promise<void> {
   await api.delete(`/eventos/${id}`)
 }
 
+// ─── Link de convite de evento exclusivo ──────────────────────────
+
+export interface EventoLinkInfo {
+  id: string
+  titulo: string
+  descricao: string
+  banner_url: string | null
+  tipo: string
+  data_evento: string
+  hora_inicio: string
+  hora_fim: string
+  local: string
+  endereco: string
+  status: string
+  exclusivo: boolean
+}
+
+/** Info pública mínima do evento exclusivo a partir do link (token). */
+export async function fetchEventoPorLink(id: string, token: string): Promise<EventoLinkInfo> {
+  return api.get<EventoLinkInfo>(`/public/evento-exclusivo/${id}`, { t: token })
+}
+
+/** Corretor logado entra no evento exclusivo pelo link de convite. */
+export async function entrarEventoPorLink(id: string, token: string): Promise<{ ok: boolean; evento_id: string }> {
+  return api.post(`/eventos/${id}/entrar`, { token })
+}
+
 /** Upload de banner do evento */
 export async function uploadBannerEvento(
   id: string,

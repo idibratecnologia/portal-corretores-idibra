@@ -42,6 +42,7 @@ const ResetarSenhaPage = lazyNamed(() => import('@/pages/ResetarSenhaPage'), 'Re
 const PublicEventoPage = lazyNamed(() => import('@/pages/PublicEventoPage'), 'PublicEventoPage')
 const ValidarCertificadoPage = lazyNamed(() => import('@/pages/ValidarCertificadoPage'), 'ValidarCertificadoPage')
 const DescadastrarEmail = lazyNamed(() => import('@/pages/DescadastrarEmail'), 'DescadastrarEmail')
+const EventoExclusivoPage = lazyNamed(() => import('@/pages/EventoExclusivoPage'), 'EventoExclusivoPage')
 
 // Admin pages
 const AdminDashboard = lazyNamed(() => import('@/pages/admin/AdminDashboard'), 'AdminDashboard')
@@ -116,6 +117,7 @@ function AppRoutes() {
       <Route path="/evento/:id" element={<PublicEventoPage />} />
       <Route path="/validar/:codigo" element={<ValidarCertificadoPage />} />
       <Route path="/descadastrar" element={<DescadastrarEmail />} />
+      <Route path="/evento-exclusivo/:id" element={<EventoExclusivoPage />} />
 
       {/* Redireciona variações de login para a raiz (consolida o canônico) */}
       <Route path="/login" element={<Navigate to="/" replace />} />

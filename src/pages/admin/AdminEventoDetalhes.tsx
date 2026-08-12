@@ -38,6 +38,7 @@ export function AdminEventoDetalhes() {
   const [enviandoCert, setEnviandoCert] = useState(false)
   const [scanResult, setScanResult] = useState<{ ok: boolean; message: string; name?: string } | null>(null)
   const [manualToken, setManualToken] = useState('')
+  const [linkCopiado, setLinkCopiado] = useState(false)
   const scanResultTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Lista de inscritos: filtro por status + paginação
   const [fStatus, setFStatus] = useState<'' | 'inscrito' | 'presente' | 'ausente' | 'cancelado'>('')
@@ -267,6 +268,44 @@ export function AdminEventoDetalhes() {
           )}
         </div>
       </div>
+
+      {/* Link de convite (evento exclusivo) */}
+      {evento.exclusivo && evento.link_exclusivo && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <QrCode className="w-4 h-4 text-green-600" />
+            <h2 className="font-semibold text-gray-900">Link de convite</h2>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Compartilhe este link com o público desejado. Quem abrir e entrar como corretor é adicionado automaticamente e pode se inscrever. O evento continua invisível para quem não tem o link.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              readOnly
+              value={evento.link_exclusivo}
+              onFocus={(e) => e.target.select()}
+              className="flex-1 h-10 px-3 rounded-lg border border-gray-200 bg-gray-50 text-xs text-gray-600 font-mono"
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={async () => { try { await navigator.clipboard.writeText(evento.link_exclusivo!); setLinkCopiado(true); setTimeout(() => setLinkCopiado(false), 2000) } catch { /* clipboard indisponível */ } }}
+                className="border-gray-200 gap-1.5"
+              >
+                {linkCopiado ? <><CheckCircle className="w-4 h-4 text-green-600" /> Copiado</> : <><Download className="w-4 h-4" /> Copiar</>}
+              </Button>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`Convite para o evento "${evento.titulo}": ${evento.link_exclusivo}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-green-700 hover:bg-green-800 text-white text-sm font-medium"
+              >
+                <Send className="w-4 h-4" /> WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

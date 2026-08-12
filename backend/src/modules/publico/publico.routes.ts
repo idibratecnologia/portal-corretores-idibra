@@ -7,7 +7,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { getEventoPublico } from '@/modules/eventos/eventos.service'
+import { getEventoPublico, getEventoPorLink } from '@/modules/eventos/eventos.service'
 import { tokenDescadastroValido } from '@/lib/descadastro'
 import { BadRequestError, NotFoundError } from '@/lib/errors'
 
@@ -15,6 +15,13 @@ export async function publicoRoutes(app: FastifyInstance) {
   app.get('/eventos/:id', async (req, reply) => {
     const { id } = z.object({ id: z.string().uuid('ID inválido') }).parse(req.params)
     return reply.send(await getEventoPublico(id))
+  })
+
+  // Landing do link de convite de evento exclusivo (info mínima, via token)
+  app.get('/evento-exclusivo/:id', async (req, reply) => {
+    const { id } = z.object({ id: z.string().uuid('Link inválido') }).parse(req.params)
+    const { t } = z.object({ t: z.string().min(10) }).parse(req.query)
+    return reply.send(await getEventoPorLink(id, t))
   })
 
   // ── Preferência de e-mail (LGPD) ───────────────────────────────

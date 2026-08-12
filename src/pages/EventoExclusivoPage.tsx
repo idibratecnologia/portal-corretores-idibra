@@ -40,8 +40,9 @@ export function EventoExclusivoPage() {
     }
   }
 
+  // O login fica na rota "/" (── /login é redirecionado e descartaria a query).
   const irParaLogin = () =>
-    navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`)
+    navigate(`/?redirect=${encodeURIComponent(location.pathname + location.search)}`)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-green-50 flex flex-col items-center justify-center p-4">

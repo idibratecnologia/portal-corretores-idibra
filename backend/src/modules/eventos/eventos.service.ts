@@ -3,7 +3,7 @@
  */
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { NotFoundError, BadRequestError } from '@/lib/errors'
+import { NotFoundError, BadRequestError, ConflictError } from '@/lib/errors'
 import { notify } from '@/lib/notifications'
 import { saveImage, deleteImage } from '@/lib/storage'
 import { resolvePagination, buildPaginated } from '@/lib/pagination'
@@ -12,6 +12,7 @@ import { emitAdminRefresh } from '@/lib/events'
 import { formatDataEvento } from '@/lib/format'
 import { config } from '@/config'
 import { urlEventoExclusivo, tokenEventoValido } from '@/lib/evento-token'
+import { createInscricao } from '@/modules/inscricoes/inscricoes.service'
 import type { ListEventosInput, CreateEventoInput, UpdateEventoInput } from './eventos.schema'
 
 /** Adiciona total_inscritos e total_presentes a partir das inscrições. */
@@ -107,11 +108,13 @@ export async function getEventoPorLink(id: string, token: string) {
   return ev
 }
 
-/** Corretor entra no evento pelo link de convite: valida o token e se auto-convida. */
+/** Corretor entra no evento pelo link de convite: valida o token, se auto-convida e se inscreve. */
 export async function entrarPorLink(eventoId: string, corretorId: string, token: string) {
   if (!tokenEventoValido(eventoId, token)) throw new BadRequestError('Link inválido ou expirado')
   const ev = await prisma.evento.findUnique({ where: { id: eventoId }, select: { exclusivo: true, status: true } })
   if (!ev) throw new NotFoundError('Evento não encontrado')
+
+  // Dá acesso (convidado) ao evento exclusivo
   if (ev.exclusivo) {
     await prisma.eventoConvidado.upsert({
       where:  { evento_id_corretor_id: { evento_id: eventoId, corretor_id: corretorId } },
@@ -119,7 +122,19 @@ export async function entrarPorLink(eventoId: string, corretorId: string, token:
       create: { evento_id: eventoId, corretor_id: corretorId },
     })
   }
-  return { ok: true, evento_id: eventoId }
+
+  // Inscreve o corretor (idempotente: se já estava inscrito, segue em frente).
+  // Reaproveita as regras de negócio e o envio do QR de confirmação.
+  let inscrito = true
+  try {
+    await createInscricao(corretorId, eventoId)
+  } catch (err) {
+    if (err instanceof ConflictError) { /* já inscrito */ }
+    else if (err instanceof BadRequestError) { inscrito = false } // ex.: inscrições fechadas/lotado
+    else throw err
+  }
+
+  return { ok: true, evento_id: eventoId, inscrito }
 }
 
 // ─── Página pública (compartilhamento, sem login) ────────────────

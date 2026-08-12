@@ -146,8 +146,8 @@ export async function fetchEventoPorLink(id: string, token: string): Promise<Eve
   return api.get<EventoLinkInfo>(`/public/evento-exclusivo/${id}`, { t: token })
 }
 
-/** Corretor logado entra no evento exclusivo pelo link de convite. */
-export async function entrarEventoPorLink(id: string, token: string): Promise<{ ok: boolean; evento_id: string }> {
+/** Corretor logado entra (acesso + inscrição) no evento exclusivo pelo link de convite. */
+export async function entrarEventoPorLink(id: string, token: string): Promise<{ ok: boolean; evento_id: string; inscrito: boolean }> {
   return api.post(`/eventos/${id}/entrar`, { token })
 }
 

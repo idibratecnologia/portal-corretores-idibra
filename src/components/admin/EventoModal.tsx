@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Upload, X, Lock, Search, Users, Award } from 'lucide-react'
+import { Upload, X, Lock, Search, Users, Award, Link2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -152,10 +152,8 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
   }
 
   const onSubmit = async (data: FormData) => {
-    if (exclusivo && convidados.length === 0) {
-      toast({ title: 'Selecione os convidados', description: 'Um evento exclusivo precisa de ao menos um corretor selecionado.', variant: 'destructive' })
-      return
-    }
+    // Evento exclusivo pode ficar sem convidados pré-selecionados: o acesso pode
+    // ser dado depois pelo link de convite (gerado no detalhe do evento).
     setSaving(true)
     try {
       await onSave(
@@ -327,7 +325,7 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
                 <input type="checkbox" checked={exclusivo} onChange={(e) => setExclusivo(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-green-600 flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 text-green-600" /> Evento exclusivo</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Só os corretores selecionados verão o evento e receberão a notificação.</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Só quem for convidado (selecionado abaixo <strong>ou</strong> pelo link) verá o evento.</p>
                 </div>
               </label>
 
@@ -351,6 +349,10 @@ export function EventoModal({ open, onClose, onSave, evento }: EventoModalProps)
                       </label>
                     ))}
                   </div>
+                  <p className="text-[11px] text-gray-400 flex items-start gap-1.5">
+                    <Link2 className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-green-600" />
+                    Pode deixar sem selecionar ninguém: depois de criar, use o <strong>link de convite</strong> (no detalhe do evento) para dar acesso a quem quiser.
+                  </p>
                 </div>
               )}
             </div>

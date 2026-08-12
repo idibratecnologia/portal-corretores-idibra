@@ -49,12 +49,22 @@ export async function listByCorretor(corretorId: string) {
 
 // ─── Criar inscrição (corretor) ──────────────────────────────────
 
-export async function createInscricao(corretorId: string, eventoId: string) {
+export async function createInscricao(
+  corretorId: string,
+  eventoId: string,
+  opts: { ignorarStatus?: boolean } = {},
+) {
   const evento = await prisma.evento.findUnique({ where: { id: eventoId } })
   if (!evento) throw new NotFoundError('Evento não encontrado')
 
-  // Regras de negócio
-  if (evento.status !== 'publicado') {
+  // Regras de negócio. `ignorarStatus` é usado no fluxo do link de convite: um
+  // evento exclusivo pode aceitar inscrição mesmo em rascunho (o link é a distribuição),
+  // mas nunca se estiver cancelado ou encerrado.
+  if (opts.ignorarStatus) {
+    if (evento.status === 'cancelado' || evento.status === 'encerrado') {
+      throw new BadRequestError('Este evento não está aberto para inscrições')
+    }
+  } else if (evento.status !== 'publicado') {
     throw new BadRequestError('Este evento não está aberto para inscrições')
   }
   if (!evento.inscricoes_abertas) {

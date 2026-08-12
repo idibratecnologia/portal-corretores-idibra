@@ -127,7 +127,8 @@ export async function entrarPorLink(eventoId: string, corretorId: string, token:
   // Reaproveita as regras de negócio e o envio do QR de confirmação.
   let inscrito = true
   try {
-    await createInscricao(corretorId, eventoId)
+    // Evento exclusivo pode aceitar inscrição via link mesmo em rascunho.
+    await createInscricao(corretorId, eventoId, { ignorarStatus: ev.exclusivo })
   } catch (err) {
     if (err instanceof ConflictError) { /* já inscrito */ }
     else if (err instanceof BadRequestError) { inscrito = false } // ex.: inscrições fechadas/lotado

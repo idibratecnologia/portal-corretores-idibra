@@ -39,7 +39,7 @@ export async function templatesRoutes(app: FastifyInstance) {
   app.post('/:tipo/imagem', async (req, reply) => {
     const { tipo } = tipoParam.parse(req.params)
     const atual = await service.getTemplate(tipo)
-    const buffer = await readImageUpload(req)
+    const buffer = await readImageUpload(req, { maxSizeMB: 25 })
     const imagem_url = await saveImage('banners', buffer)
     if (atual.imagem_url) await deleteImage(atual.imagem_url)
     return reply.send(await service.updateTemplate(tipo, { imagem_url }))

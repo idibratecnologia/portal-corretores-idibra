@@ -104,7 +104,7 @@ function TemplateEditor({
   const handleUploadImagem = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
-    if (f.size > 10 * 1024 * 1024) { toast({ title: 'Imagem muito grande', description: 'Máximo 10 MB.', variant: 'destructive' }); return }
+    if (f.size > 25 * 1024 * 1024) { toast({ title: 'Imagem muito grande', description: 'Máximo 25 MB.', variant: 'destructive' }); return }
     setUploadingImg(true)
     try {
       onSaved(await uploadTemplateImagem(template.tipo, f))
@@ -219,22 +219,29 @@ function TemplateEditor({
         <div className="pt-2 border-t border-gray-100">
           <p className="text-xs font-semibold text-gray-500 mb-2">Banner desta comunicação {isEventoTemplate && <span className="font-normal text-gray-400">(usado quando o evento não tem banner)</span>}</p>
           <div className="flex items-center gap-3">
-            <div className="w-24 h-14 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0 border border-gray-200">
+            <div className="relative w-24 h-14 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0 border border-gray-200">
               {template.imagem_url
                 ? <img src={template.imagem_url} alt="Banner" className="w-full h-full object-cover" />
                 : <ImageIcon className="w-5 h-5 text-gray-300" />}
+              {uploadingImg && (
+                <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 text-green-600 animate-spin" />
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <input ref={fileImgRef} type="file" accept="image/*" onChange={handleUploadImagem} className="hidden" />
               <Button variant="outline" size="sm" onClick={() => fileImgRef.current?.click()} disabled={uploadingImg} className="gap-1.5 border-gray-200">
-                <ImageIcon className="w-3.5 h-3.5" /> {template.imagem_url ? 'Trocar' : 'Enviar banner'}
+                {uploadingImg
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Enviando…</>
+                  : <><ImageIcon className="w-3.5 h-3.5" /> {template.imagem_url ? 'Trocar' : 'Enviar banner'}</>}
               </Button>
-              {template.imagem_url && (
+              {template.imagem_url && !uploadingImg && (
                 <Button variant="ghost" size="sm" onClick={handleRemoverImagem} disabled={uploadingImg} className="text-gray-500 hover:text-red-600">Remover</Button>
               )}
             </div>
           </div>
-          <p className="text-[11px] text-gray-400 mt-1.5">JPG/PNG até 10 MB. O sistema otimiza automaticamente para 1200×630 (leve) e envia como imagem no WhatsApp e no topo do e-mail.</p>
+          <p className="text-[11px] text-gray-400 mt-1.5">JPG/PNG até 25 MB. O sistema otimiza automaticamente para 1200×630 (leve) e envia como imagem no WhatsApp e no topo do e-mail.</p>
         </div>
 
         {/* Opções extras */}

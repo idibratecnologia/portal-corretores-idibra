@@ -83,10 +83,11 @@ async function buildServer() {
     timeWindow: '1 minute',
   })
 
-  // Upload de arquivos (multipart) — limite por tamanho configurável
+  // Upload de arquivos (multipart). O teto do plugin acomoda o maior caso (banners
+  // até 25 MB); cada rota aplica o seu próprio limite por chamada (ex.: 10 MB padrão).
   await app.register(multipart, {
     limits: {
-      fileSize: config.upload.maxSizeMB * 1024 * 1024,
+      fileSize: Math.max(config.upload.maxSizeMB, 25) * 1024 * 1024,
       files:    1,
     },
   })

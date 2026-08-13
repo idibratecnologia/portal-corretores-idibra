@@ -104,7 +104,7 @@ function TemplateEditor({
   const handleUploadImagem = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
-    if (f.size > 5 * 1024 * 1024) { toast({ title: 'Imagem muito grande', description: 'Máximo 5 MB.', variant: 'destructive' }); return }
+    if (f.size > 10 * 1024 * 1024) { toast({ title: 'Imagem muito grande', description: 'Máximo 10 MB.', variant: 'destructive' }); return }
     setUploadingImg(true)
     try {
       onSaved(await uploadTemplateImagem(template.tipo, f))
@@ -234,7 +234,7 @@ function TemplateEditor({
               )}
             </div>
           </div>
-          <p className="text-[11px] text-gray-400 mt-1.5">JPG/PNG · recomendado 1200×630. Vai como imagem no WhatsApp e no topo do e-mail.</p>
+          <p className="text-[11px] text-gray-400 mt-1.5">JPG/PNG até 10 MB. O sistema otimiza automaticamente para 1200×630 (leve) e envia como imagem no WhatsApp e no topo do e-mail.</p>
         </div>
 
         {/* Opções extras */}

@@ -22,7 +22,7 @@ export async function disparosAgendadosRoutes(app: FastifyInstance) {
   })
 
   app.post('/', async (req, reply) => {
-    let raw: { mensagem?: string; corretor_ids?: unknown; canais?: unknown; assunto?: string; agendado_para?: string } = {}
+    let raw: { mensagem?: string; corretor_ids?: unknown; canais?: unknown; assunto?: string; agendado_para?: string; evento_id?: string } = {}
     let anexo: { base64: string; fileName: string; mimeType: string } | undefined
 
     if (req.isMultipart()) {
@@ -38,6 +38,7 @@ export async function disparosAgendadosRoutes(app: FastifyInstance) {
           else if (part.fieldname === 'canais') raw.canais = JSON.parse(v)
           else if (part.fieldname === 'assunto') raw.assunto = v
           else if (part.fieldname === 'agendado_para') raw.agendado_para = v
+          else if (part.fieldname === 'evento_id') raw.evento_id = v
         }
       }
     } else {
@@ -50,13 +51,14 @@ export async function disparosAgendadosRoutes(app: FastifyInstance) {
       canais:        z.object({ whatsapp: z.boolean(), email: z.boolean() }).default({ whatsapp: true, email: false }),
       assunto:       z.string().trim().optional(),
       agendado_para: z.coerce.date(),
+      evento_id:     z.string().uuid().optional(),
     }).refine((v) => v.canais.whatsapp || v.canais.email, { message: 'Selecione ao menos um canal', path: ['canais'] })
       .parse(raw)
 
     const d = await service.criarDisparoAgendado({
       mensagem: parsed.mensagem, assunto: parsed.assunto,
       canalWhatsapp: parsed.canais.whatsapp, canalEmail: parsed.canais.email,
-      corretorIds: parsed.corretor_ids, agendadoPara: parsed.agendado_para, anexo,
+      corretorIds: parsed.corretor_ids, agendadoPara: parsed.agendado_para, anexo, eventoId: parsed.evento_id,
     })
     audit(req, 'criou', 'broadcast', d.id, `Disparo agendado · ${parsed.corretor_ids.length} corretor(es)`, parsed.mensagem.slice(0, 120))
     return reply.status(201).send(d)

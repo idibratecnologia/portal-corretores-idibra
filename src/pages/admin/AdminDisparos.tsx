@@ -28,6 +28,7 @@ export function AdminDisparos() {
   // Selecionar público por evento (pós-evento)
   const [eventos, setEventos] = useState<Evento[]>([])
   const [eventoSel, setEventoSel] = useState('')
+  const [vincularEvento, setVincularEvento] = useState(false)
   interface PublicoItem { id: string; nome: string; creci: string; checkin_at: string | null }
   const [publico, setPublico] = useState<{
     open: boolean; status: 'presente' | 'inscrito' | 'ausente'; loading: boolean
@@ -129,8 +130,17 @@ export function AdminDisparos() {
   const resetForm = () => {
     setSelected(new Set()); setMensagem(''); setAnexo(null)
     setAgendar(false); setAgendarPara('')
+    setVincularEvento(false); setEventoSel('')
     if (fileRef.current) fileRef.current.value = ''
   }
+
+  const inserirLinkEvento = () => {
+    if (!eventoSel) return
+    const url = `${window.location.origin}/portal/eventos/${eventoSel}`
+    setMensagem((m) => `${m.trimEnd()}${m.trim() ? '\n\n' : ''}${url}`)
+  }
+
+  const eventoIdVinc = vincularEvento && eventoSel ? eventoSel : undefined
 
   const handleEnviar = async () => {
     setConfirmar(false)
@@ -141,11 +151,11 @@ export function AdminDisparos() {
 
       if (agendar) {
         const iso = new Date(agendarPara).toISOString()
-        const d = await agendarDisparo(mensagem.trim(), [...selected], canais, iso, assuntoFinal, anexo ?? undefined)
+        const d = await agendarDisparo(mensagem.trim(), [...selected], canais, iso, assuntoFinal, anexo ?? undefined, eventoIdVinc)
         toast({ title: 'Disparo agendado', description: `Para ${formatDateTime(d.agendado_para)} · ${d.total_corretores} corretor(es).` })
         carregarAgendados()
       } else {
-        const r = await dispararEmMassa(mensagem.trim(), [...selected], canais, assuntoFinal, anexo ?? undefined)
+        const r = await dispararEmMassa(mensagem.trim(), [...selected], canais, assuntoFinal, anexo ?? undefined, eventoIdVinc)
         const partes: string[] = []
         if (canalWhats) partes.push(`WhatsApp: ${r.whatsapp}`)
         if (canalEmail) partes.push(`E-mail: ${r.emails}`)
@@ -265,11 +275,22 @@ export function AdminDisparos() {
               {eventos.map((ev) => <option key={ev.id} value={ev.id}>{ev.titulo}</option>)}
             </select>
             {eventoSel && (
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => abrirPublico('presente')} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100">Ver presentes</button>
-                <button onClick={() => abrirPublico('inscrito')} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100">Ver inscritos</button>
-                <button onClick={() => abrirPublico('ausente')} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100">Ver ausentes</button>
-              </div>
+              <>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => abrirPublico('presente')} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100">Ver presentes</button>
+                  <button onClick={() => abrirPublico('inscrito')} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100">Ver inscritos</button>
+                  <button onClick={() => abrirPublico('ausente')} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100">Ver ausentes</button>
+                </div>
+                <div className="pt-2 border-t border-gray-100 space-y-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={vincularEvento} onChange={(e) => setVincularEvento(e.target.checked)} className="rounded border-gray-300 accent-green-600" />
+                    Usar o <strong className="font-semibold">banner do evento</strong> na mensagem
+                  </label>
+                  <button onClick={inserirLinkEvento} type="button" className="text-xs text-gray-600 hover:text-green-700 inline-flex items-center gap-1.5">
+                    <Send className="w-3.5 h-3.5" /> Inserir link do evento na mensagem
+                  </button>
+                </div>
+              </>
             )}
           </div>
 

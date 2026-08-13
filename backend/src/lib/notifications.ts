@@ -51,7 +51,7 @@ const ASSUNTO_EMAIL: Record<NotificacaoTipo, string> = {
  * Best-effort: não bloqueia nem derruba o fluxo se falhar/estiver desativado.
  */
 function enviarEmailNotificacao(
-  corretorId: string, tipo: NotificacaoTipo, mensagem: string, attachments?: EmailAttachment[], assunto?: string, eventoId?: string,
+  corretorId: string, tipo: NotificacaoTipo, mensagem: string, attachments?: EmailAttachment[], assunto?: string, eventoId?: string, bannerUrl?: string,
 ): void {
   if (!emailEnabled()) return
   const marketing = TIPOS_MARKETING.has(tipo)
@@ -60,7 +60,10 @@ function enviarEmailNotificacao(
     if (!corretor?.email) return
     // LGPD: e-mails de marketing só vão para quem está com opt-in ativo
     if (marketing && !corretor.email_opt_in) return
-    const html = montarHtmlEmail(mensagem, marketing ? { descadastroUrl: urlDescadastro(corretorId) } : undefined)
+    const html = montarHtmlEmail(mensagem, {
+      ...(marketing ? { descadastroUrl: urlDescadastro(corretorId) } : {}),
+      ...(bannerUrl ? { bannerUrl } : {}),
+    })
     try {
       await sendEmail({ to: corretor.email, subject: assunto || ASSUNTO_EMAIL[tipo], html, attachments })
       await prisma.notificacaoLog.create({
@@ -103,7 +106,9 @@ export async function notify(params: NotifyParams): Promise<void> {
   // E-mail: canal independente (não usa o opt-in de WhatsApp). Best-effort.
   if (canais?.email !== false) {
     const emailAnexos = anexo ? [{ name: anexo.fileName, contentBytes: anexo.base64, contentType: anexo.mimeType }] : undefined
-    enviarEmailNotificacao(corretorId, tipo, mensagem, emailAnexos, assunto, eventoId)
+    // Banner do e-mail: usa a imagem por URL (ex.: banner do evento). Precisa ser absoluta.
+    const bannerUrl = imagemUrl && /^https?:\/\//i.test(imagemUrl) ? imagemUrl : undefined
+    enviarEmailNotificacao(corretorId, tipo, mensagem, emailAnexos, assunto, eventoId, bannerUrl)
   }
 
   // WhatsApp: respeita o opt-in (LGPD) e a seleção de canal

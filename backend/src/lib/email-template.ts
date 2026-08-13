@@ -16,10 +16,13 @@ function textoParaHtml(texto: string): string {
 }
 
 /** Envelopa o conteúdo num layout de e-mail responsivo e simples. */
-export function montarHtmlEmail(mensagem: string, opts?: { descadastroUrl?: string }): string {
+export function montarHtmlEmail(mensagem: string, opts?: { descadastroUrl?: string; bannerUrl?: string }): string {
   const corpo = textoParaHtml(mensagem)
   const rodapeDescadastro = opts?.descadastroUrl
     ? `<br><a href="${opts.descadastroUrl}" style="color:#9ca3af;text-decoration:underline">Não quero mais receber estes e-mails</a>`
+    : ''
+  const banner = opts?.bannerUrl
+    ? `<tr><td style="padding:0"><img src="${opts.bannerUrl}" alt="" style="display:block;width:100%;max-width:560px;height:auto" /></td></tr>`
     : ''
   return `<!doctype html><html><body style="margin:0;background:#f1f5f9;padding:24px 0;font-family:Arial,Helvetica,sans-serif;color:#374151">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
@@ -28,6 +31,7 @@ export function montarHtmlEmail(mensagem: string, opts?: { descadastroUrl?: stri
         <span style="color:#ffffff;font-size:18px;font-weight:bold;letter-spacing:.5px">IDIBRA</span>
         <span style="color:#bbf7d0;font-size:12px;display:block;margin-top:2px">Portal de Corretores</span>
       </td></tr>
+      ${banner}
       <tr><td style="padding:28px;font-size:15px;line-height:1.6">${corpo}</td></tr>
       <tr><td style="padding:16px 28px;border-top:1px solid #f1f5f9;color:#9ca3af;font-size:12px">
         Esta é uma mensagem automática do Portal de Corretores IDIBRA.${rodapeDescadastro}

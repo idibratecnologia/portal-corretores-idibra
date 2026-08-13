@@ -71,12 +71,21 @@ export async function broadcast(
   opts: {
     whatsapp: boolean; email: boolean; assunto?: string
     anexo?: { base64: string; fileName: string; mimeType: string }
+    eventoId?: string
   } = { whatsapp: true, email: false },
 ): Promise<{ total: number; whatsapp: number; emails: number; semCanal: number }> {
   const corretores = await prisma.corretor.findMany({
     where:  { id: { in: corretorIds } },
     select: { id: true, nome: true, whatsapp: true, whatsapp_opt_in: true, email: true, email_opt_in: true },
   })
+
+  // Vinculado a um evento: usa o banner do evento como imagem (WhatsApp + e-mail),
+  // desde que não haja um anexo próprio (anexo tem prioridade).
+  let bannerUrl: string | undefined
+  if (opts.eventoId && !opts.anexo) {
+    const ev = await prisma.evento.findUnique({ where: { id: opts.eventoId }, select: { banner_url: true } })
+    bannerUrl = ev?.banner_url ?? undefined
+  }
 
   let whatsappCount = 0
   let emailsCount = 0
@@ -88,6 +97,7 @@ export async function broadcast(
 
     await notify({
       corretorId: c.id,
+      eventoId:   opts.eventoId,
       tipo:       'broadcast',
       whatsapp:   c.whatsapp,
       optIn:      c.whatsapp_opt_in,
@@ -95,6 +105,7 @@ export async function broadcast(
       canais:     { whatsapp: opts.whatsapp, email: opts.email },
       assunto:    opts.assunto,
       anexo:      opts.anexo,
+      imagemUrl:  bannerUrl,
     })
     if (podeWhats) whatsappCount++
     if (podeEmail) emailsCount++

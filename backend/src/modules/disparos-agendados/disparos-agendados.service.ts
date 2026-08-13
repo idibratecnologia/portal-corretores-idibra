@@ -14,12 +14,13 @@ export interface CriarDisparoAgendadoInput {
   corretorIds: string[]
   agendadoPara: Date
   anexo?: { base64: string; fileName: string; mimeType: string }
+  eventoId?: string
 }
 
 const selectResumo = {
   id: true, mensagem: true, assunto: true, canal_whatsapp: true, canal_email: true,
   corretor_ids: true, agendado_para: true, status: true, resultado: true, erro: true,
-  enviado_at: true, created_at: true, anexo_nome: true,
+  enviado_at: true, created_at: true, anexo_nome: true, evento_id: true,
 } as const
 
 interface RowResumo {
@@ -36,6 +37,7 @@ interface RowResumo {
   enviado_at: Date | null
   created_at: Date
   anexo_nome: string | null
+  evento_id: string | null
 }
 
 function mapResumo(r: RowResumo) {
@@ -50,7 +52,7 @@ export async function criarDisparoAgendado(i: CriarDisparoAgendadoInput) {
     data: {
       mensagem: i.mensagem, assunto: i.assunto ?? null,
       canal_whatsapp: i.canalWhatsapp, canal_email: i.canalEmail,
-      corretor_ids: i.corretorIds, agendado_para: i.agendadoPara,
+      corretor_ids: i.corretorIds, agendado_para: i.agendadoPara, evento_id: i.eventoId ?? null,
       anexo_base64: i.anexo?.base64 ?? null, anexo_nome: i.anexo?.fileName ?? null, anexo_mime: i.anexo?.mimeType ?? null,
     },
     select: selectResumo,
@@ -101,6 +103,7 @@ export async function executarDisparosPendentes(): Promise<number> {
           : undefined
         const r = await broadcast(d.mensagem, d.corretor_ids, {
           whatsapp: d.canal_whatsapp, email: d.canal_email, assunto: d.assunto ?? undefined, anexo,
+          eventoId: d.evento_id ?? undefined,
         })
         const resultado = `WhatsApp ${r.whatsapp} · E-mail ${r.emails}${r.semCanal ? ` · ${r.semCanal} sem canal` : ''}`
         await prisma.disparoAgendado.update({

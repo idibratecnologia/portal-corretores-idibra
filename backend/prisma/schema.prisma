@@ -460,6 +460,7 @@ model DisparoAgendado {
   assunto        String?
   canal_whatsapp Boolean   @default(true)
   canal_email    Boolean   @default(false)
+  evento_id      String?   // vincula o disparo a um evento (usa o banner do evento)
   corretor_ids   String[]
   anexo_base64   String?   // anexo opcional embutido (base64)
   anexo_nome     String?

@@ -51,6 +51,7 @@ export async function dispararEmMassa(
   canais: { whatsapp: boolean; email: boolean },
   assunto?: string,
   anexo?: File,
+  eventoId?: string,
 ): Promise<DisparoResultado> {
   if (USE_MOCK) return { total: corretorIds.length, whatsapp: canais.whatsapp ? corretorIds.length : 0, emails: canais.email ? corretorIds.length : 0, semCanal: 0 }
   const form = new FormData()
@@ -59,5 +60,6 @@ export async function dispararEmMassa(
   form.append('canais', JSON.stringify(canais))
   if (assunto) form.append('assunto', assunto)
   if (anexo) form.append('file', anexo)
+  if (eventoId) form.append('evento_id', eventoId)
   return api.upload<DisparoResultado>('/whatsapp/broadcast', form)
 }

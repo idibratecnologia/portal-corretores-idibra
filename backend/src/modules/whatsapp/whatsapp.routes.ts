@@ -70,7 +70,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
   // Disparo em massa (respeita opt-in e a fila)
   app.post('/broadcast', async (req, reply) => {
     // Aceita JSON (sem anexo) ou multipart/form-data (com anexo opcional)
-    let raw: { mensagem?: string; corretor_ids?: unknown; canais?: unknown; assunto?: string } = {}
+    let raw: { mensagem?: string; corretor_ids?: unknown; canais?: unknown; assunto?: string; evento_id?: string } = {}
     let anexo: { base64: string; fileName: string; mimeType: string } | undefined
 
     if (req.isMultipart()) {
@@ -85,21 +85,23 @@ export async function whatsappRoutes(app: FastifyInstance) {
           else if (part.fieldname === 'corretor_ids') raw.corretor_ids = JSON.parse(v)
           else if (part.fieldname === 'canais') raw.canais = JSON.parse(v)
           else if (part.fieldname === 'assunto') raw.assunto = v
+          else if (part.fieldname === 'evento_id') raw.evento_id = v
         }
       }
     } else {
       raw = req.body as typeof raw
     }
 
-    const { mensagem, corretor_ids, canais, assunto } = z.object({
+    const { mensagem, corretor_ids, canais, assunto, evento_id } = z.object({
       mensagem:     z.string().trim().min(1, 'Mensagem obrigatória'),
       corretor_ids: z.array(z.string().uuid()).min(1, 'Selecione ao menos um corretor'),
       canais:       z.object({ whatsapp: z.boolean(), email: z.boolean() }).default({ whatsapp: true, email: false }),
       assunto:      z.string().trim().optional(),
+      evento_id:    z.string().uuid().optional(),
     }).refine((v) => v.canais.whatsapp || v.canais.email, { message: 'Selecione ao menos um canal', path: ['canais'] })
       .parse(raw)
 
-    const r = await broadcast(mensagem, corretor_ids, { whatsapp: canais.whatsapp, email: canais.email, assunto, anexo })
+    const r = await broadcast(mensagem, corretor_ids, { whatsapp: canais.whatsapp, email: canais.email, assunto, anexo, eventoId: evento_id })
     audit(req, 'enviou', 'broadcast', null, `WhatsApp ${r.whatsapp} · E-mail ${r.emails}${anexo ? ' · com anexo' : ''}`, mensagem.slice(0, 120))
     return reply.send(r)
   })

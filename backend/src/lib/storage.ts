@@ -31,19 +31,25 @@ export async function saveImage(kind: ImageKind, buffer: Buffer): Promise<string
   const dir = join(resolve(config.upload.dir), kind)
   await mkdir(dir, { recursive: true })
 
-  const filename = `${randomUUID()}.webp`
   const { width, height, fit, quality } = IMAGE_CONFIG[kind]
 
-  await sharp(buffer)
-    .resize(width, height, {
-      fit,
-      position: 'center',
-      withoutEnlargement: fit === 'inside', // logo pequeno não é esticado
-    })
-    .webp({ quality })
-    .toFile(join(dir, filename))
+  // Banners são usados em e-mail (que não renderiza WebP com alpha — mostra preto).
+  // Por isso saem em JPEG achatado sobre branco: compatível com todo cliente + WhatsApp.
+  const asJpeg = kind === 'banners'
+  const filename = `${randomUUID()}.${asJpeg ? 'jpg' : 'webp'}`
 
-  // URL pública: https://api.idibra.com.br/uploads/fotos/uuid.webp
+  const base = sharp(buffer).resize(width, height, {
+    fit,
+    position: 'center',
+    withoutEnlargement: fit === 'inside', // logo pequeno não é esticado
+  })
+
+  await (asJpeg
+    ? base.flatten({ background: '#ffffff' }).jpeg({ quality })
+    : base.webp({ quality })
+  ).toFile(join(dir, filename))
+
+  // URL pública: https://api.idibra.com.br/uploads/<kind>/uuid.<ext>
   return `${config.upload.apiUrl}/uploads/${kind}/${filename}`
 }
 

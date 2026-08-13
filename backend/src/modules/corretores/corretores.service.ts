@@ -233,6 +233,7 @@ export async function setStatus(id: string, status: 'pendente' | 'ativo' | 'bloq
       await notify({
         corretorId: corretor.id, tipo: 'aprovacao',
         whatsapp: corretor.whatsapp, optIn: corretor.whatsapp_opt_in, mensagem: msg.texto,
+        imagemUrl: msg.imagemUrl ?? undefined,
       })
     }
   }

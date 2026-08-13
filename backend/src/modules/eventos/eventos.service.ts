@@ -263,6 +263,7 @@ export async function setStatus(id: string, status: 'rascunho' | 'publicado' | '
           await notify({
             corretorId: i.corretor_id, eventoId: id, tipo: 'cancelamento_evento',
             whatsapp: i.corretor.whatsapp, optIn: i.corretor.whatsapp_opt_in, mensagem: msg.texto,
+            imagemUrl: msg.imagemUrl ?? undefined,
           })
         }
       })
@@ -326,7 +327,8 @@ async function broadcastEventoNovo(evento: Prisma.EventoGetPayload<object>): Pro
       corretorId: c.id, eventoId: evento.id, tipo: 'evento_novo',
       whatsapp: c.whatsapp, optIn: true,
       mensagem: msg.texto,
-      imagemUrl: msg.comImagem && evento.banner_url ? evento.banner_url : undefined,
+      // banner do evento (quando com_imagem); se não houver, cai no banner do template
+      imagemUrl: (msg.comImagem && evento.banner_url ? evento.banner_url : null) ?? msg.imagemUrl ?? undefined,
     })
   }
 }

@@ -74,6 +74,7 @@ export async function enviarParabens(corretorId: string): Promise<boolean> {
   await notify({
     corretorId: c.id, tipo: 'aniversario',
     whatsapp: c.whatsapp, optIn: c.whatsapp_opt_in, mensagem: msg.texto,
+    imagemUrl: msg.imagemUrl ?? undefined,
   })
   return true
 }

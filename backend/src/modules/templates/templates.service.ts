@@ -53,13 +53,14 @@ export async function getTemplate(tipo: string) {
   return {
     id: '', tipo: def.tipo, titulo: def.titulo, descricao: def.descricao,
     conteudo: def.conteudo, ativo: true, com_imagem: def.com_imagem,
+    imagem_url: null as string | null,
     dias_antecedencia: def.dias_antecedencia ?? null, updated_at: new Date(),
   }
 }
 
 export async function updateTemplate(
   tipo: string,
-  data: { conteudo?: string; ativo?: boolean; com_imagem?: boolean; dias_antecedencia?: number | null },
+  data: { conteudo?: string; ativo?: boolean; com_imagem?: boolean; dias_antecedencia?: number | null; imagem_url?: string | null },
 ) {
   await seedTemplates()
   const exists = await prisma.mensagemTemplate.findUnique({ where: { tipo } })
@@ -74,10 +75,10 @@ export async function updateTemplate(
 export async function renderMensagem(
   tipo: string,
   vars: Vars,
-): Promise<{ texto: string; comImagem: boolean } | null> {
+): Promise<{ texto: string; comImagem: boolean; imagemUrl: string | null } | null> {
   const tpl = await getTemplate(tipo)
   if (!tpl.ativo) return null
-  return { texto: render(tpl.conteudo, vars), comImagem: tpl.com_imagem }
+  return { texto: render(tpl.conteudo, vars), comImagem: tpl.com_imagem, imagemUrl: tpl.imagem_url ?? null }
 }
 
 /** Dias de antecedência configurados para o lembrete antecipado (default 1). */

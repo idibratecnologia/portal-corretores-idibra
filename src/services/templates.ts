@@ -10,6 +10,7 @@ export interface MensagemTemplate {
   conteudo:          string
   ativo:             boolean
   com_imagem:        boolean
+  imagem_url:        string | null
   dias_antecedencia: number | null
   updated_at:        string
   placeholders:      string[]
@@ -19,6 +20,7 @@ export interface UpdateTemplateInput {
   conteudo?:          string
   ativo?:             boolean
   com_imagem?:        boolean
+  imagem_url?:        string | null
   dias_antecedencia?: number | null
 }
 
@@ -26,7 +28,7 @@ const MOCK_TEMPLATES: MensagemTemplate[] = [
   {
     id: '1', tipo: 'evento_novo', titulo: 'Novo evento publicado',
     descricao: 'Enviado a todos os corretores ativos quando um evento é publicado.',
-    ativo: true, com_imagem: true, dias_antecedencia: null,
+    ativo: true, com_imagem: true, imagem_url: null, dias_antecedencia: null,
     updated_at: new Date().toISOString(),
     placeholders: ['nome', 'evento', 'descricao', 'data', 'hora', 'hora_fim', 'local', 'endereco', 'empreendimento', 'vagas', 'link'],
     conteudo: '🎉 *NOVO EVENTO IDIBRA* 🎉\n\n*{{evento}}*\n{{descricao}}\n\n📅 *Data:* {{data}}\n🕐 *Horário:* {{hora}} às {{hora_fim}}\n📍 *Local:* {{local}}\n🔗 *Inscreva-se:* {{link}}',
@@ -34,7 +36,7 @@ const MOCK_TEMPLATES: MensagemTemplate[] = [
   {
     id: '2', tipo: 'lembrete_antecedencia', titulo: 'Lembrete (dias antes)',
     descricao: 'Enviado X dias antes do evento aos inscritos (configure os dias).',
-    ativo: true, com_imagem: false, dias_antecedencia: 1,
+    ativo: true, com_imagem: false, imagem_url: null, dias_antecedencia: 1,
     updated_at: new Date().toISOString(),
     placeholders: ['nome', 'evento', 'data', 'hora', 'local', 'dias'],
     conteudo: '🔔 *Lembrete de evento*\n\nOlá, {{nome}}! Faltam *{{dias}}* dia(s) para o evento *{{evento}}*.',
@@ -56,4 +58,11 @@ export async function updateTemplate(tipo: string, data: UpdateTemplateInput): P
     return { ...t, ...data, updated_at: new Date().toISOString() }
   }
   return api.patch<MensagemTemplate>(`/templates/${tipo}`, data)
+}
+
+/** Envia o banner próprio da comunicação (ex.: aniversário, campanha). */
+export async function uploadTemplateImagem(tipo: string, file: File): Promise<MensagemTemplate> {
+  const form = new FormData()
+  form.append('file', file)
+  return api.upload<MensagemTemplate>(`/templates/${tipo}/imagem`, form)
 }

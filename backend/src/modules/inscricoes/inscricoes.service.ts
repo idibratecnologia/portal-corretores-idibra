@@ -345,6 +345,7 @@ export async function realizarCheckin(token: string, adminId: string): Promise<C
       corretorId: atualizada.corretor_id, eventoId: atualizada.evento_id, tipo: 'checkin',
       whatsapp: atualizada.corretor.whatsapp, optIn: await getOptIn(atualizada.corretor_id),
       mensagem: msgCheckin.texto,
+      imagemUrl: msgCheckin.imagemUrl ?? undefined,
     })
   }
 

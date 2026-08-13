@@ -523,6 +523,7 @@ model MensagemTemplate {
   conteudo          String              // texto com {{placeholders}}
   ativo             Boolean  @default(true)
   com_imagem        Boolean  @default(false) // envia o banner do evento junto (quando aplicável)
+  imagem_url        String?             // banner próprio da comunicação (ex.: aniversário, campanha)
   dias_antecedencia Int?                // usado apenas em lembrete_antecedencia
   updated_at        DateTime @updatedAt @default(now())
 

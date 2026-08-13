@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { fetchTemplates, updateTemplate, type MensagemTemplate } from '@/services/templates'
+import { fetchTemplates, updateTemplate, uploadTemplateImagem, type MensagemTemplate } from '@/services/templates'
 import { getErrorMessage } from '@/lib/errors'
 
 /** Valores de exemplo para a pré-visualização da mensagem. */
@@ -45,8 +45,11 @@ function TemplateEditor({
   const [dias, setDias] = useState<number>(template.dias_antecedencia ?? 1)
   const [showPreview, setShowPreview] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [uploadingImg, setUploadingImg] = useState(false)
+  const fileImgRef = useRef<HTMLInputElement>(null)
 
   const isLembreteAntecedencia = template.tipo === 'lembrete_antecedencia'
+  const isEventoTemplate = ['evento_novo', 'lembrete_antecedencia', 'lembrete_dia'].includes(template.tipo)
 
   const dirty =
     conteudo !== template.conteudo ||
@@ -95,6 +98,34 @@ function TemplateEditor({
       toast({ title: 'Erro ao salvar', description: getErrorMessage(err), variant: 'destructive' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleUploadImagem = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    if (f.size > 5 * 1024 * 1024) { toast({ title: 'Imagem muito grande', description: 'Máximo 5 MB.', variant: 'destructive' }); return }
+    setUploadingImg(true)
+    try {
+      onSaved(await uploadTemplateImagem(template.tipo, f))
+      toast({ title: 'Banner enviado' })
+    } catch (err) {
+      toast({ title: 'Erro ao enviar banner', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setUploadingImg(false)
+      if (fileImgRef.current) fileImgRef.current.value = ''
+    }
+  }
+
+  const handleRemoverImagem = async () => {
+    setUploadingImg(true)
+    try {
+      onSaved(await updateTemplate(template.tipo, { imagem_url: null }))
+      toast({ title: 'Banner removido' })
+    } catch (err) {
+      toast({ title: 'Erro ao remover', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setUploadingImg(false)
     }
   }
 
@@ -184,17 +215,41 @@ function TemplateEditor({
           )}
         </div>
 
+        {/* Banner próprio da comunicação */}
+        <div className="pt-2 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 mb-2">Banner desta comunicação {isEventoTemplate && <span className="font-normal text-gray-400">(usado quando o evento não tem banner)</span>}</p>
+          <div className="flex items-center gap-3">
+            <div className="w-24 h-14 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0 border border-gray-200">
+              {template.imagem_url
+                ? <img src={template.imagem_url} alt="Banner" className="w-full h-full object-cover" />
+                : <ImageIcon className="w-5 h-5 text-gray-300" />}
+            </div>
+            <div className="flex items-center gap-2">
+              <input ref={fileImgRef} type="file" accept="image/*" onChange={handleUploadImagem} className="hidden" />
+              <Button variant="outline" size="sm" onClick={() => fileImgRef.current?.click()} disabled={uploadingImg} className="gap-1.5 border-gray-200">
+                <ImageIcon className="w-3.5 h-3.5" /> {template.imagem_url ? 'Trocar' : 'Enviar banner'}
+              </Button>
+              {template.imagem_url && (
+                <Button variant="ghost" size="sm" onClick={handleRemoverImagem} disabled={uploadingImg} className="text-gray-500 hover:text-red-600">Remover</Button>
+              )}
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-1.5">JPG/PNG · recomendado 1200×630. Vai como imagem no WhatsApp e no topo do e-mail.</p>
+        </div>
+
         {/* Opções extras */}
         <div className="flex flex-wrap items-center gap-4 pt-1">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={comImagem}
-              onChange={(e) => setComImagem(e.target.checked)}
-              className="rounded accent-green-600 w-4 h-4"
-            />
-            <span className="text-sm text-gray-700">Anexar banner do evento</span>
-          </label>
+          {isEventoTemplate && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={comImagem}
+                onChange={(e) => setComImagem(e.target.checked)}
+                className="rounded accent-green-600 w-4 h-4"
+              />
+              <span className="text-sm text-gray-700">Anexar banner do evento</span>
+            </label>
+          )}
 
           {isLembreteAntecedencia && (
             <div className="flex items-center gap-2">

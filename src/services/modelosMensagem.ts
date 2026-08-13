@@ -7,6 +7,7 @@ export interface ModeloMensagem {
   nome: string
   assunto: string | null
   conteudo: string
+  imagem_url: string | null
   created_at: string
   updated_at: string
 }
@@ -32,4 +33,15 @@ export async function updateModeloMensagem(id: string, data: Partial<ModeloMensa
 
 export async function deleteModeloMensagem(id: string): Promise<void> {
   await api.delete(`/modelos-mensagem/${id}`)
+}
+
+/** Banner do modelo de comunicação (enviado no disparo). */
+export async function uploadModeloImagem(id: string, file: File): Promise<ModeloMensagem> {
+  const form = new FormData()
+  form.append('file', file)
+  return api.upload<ModeloMensagem>(`/modelos-mensagem/${id}/imagem`, form)
+}
+
+export async function removerModeloImagem(id: string): Promise<ModeloMensagem> {
+  return api.delete<ModeloMensagem>(`/modelos-mensagem/${id}/imagem`)
 }

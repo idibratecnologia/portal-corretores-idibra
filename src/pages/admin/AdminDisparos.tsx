@@ -29,6 +29,7 @@ export function AdminDisparos() {
   const [eventos, setEventos] = useState<Evento[]>([])
   const [eventoSel, setEventoSel] = useState('')
   const [vincularEvento, setVincularEvento] = useState(false)
+  const [modeloImagemUrl, setModeloImagemUrl] = useState('')
   interface PublicoItem { id: string; nome: string; creci: string; checkin_at: string | null }
   const [publico, setPublico] = useState<{
     open: boolean; status: 'presente' | 'inscrito' | 'ausente'; loading: boolean
@@ -130,7 +131,7 @@ export function AdminDisparos() {
   const resetForm = () => {
     setSelected(new Set()); setMensagem(''); setAnexo(null)
     setAgendar(false); setAgendarPara('')
-    setVincularEvento(false); setEventoSel('')
+    setVincularEvento(false); setEventoSel(''); setModeloImagemUrl('')
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -141,6 +142,7 @@ export function AdminDisparos() {
   }
 
   const eventoIdVinc = vincularEvento && eventoSel ? eventoSel : undefined
+  const imagemModelo = modeloImagemUrl || undefined
 
   const handleEnviar = async () => {
     setConfirmar(false)
@@ -151,11 +153,11 @@ export function AdminDisparos() {
 
       if (agendar) {
         const iso = new Date(agendarPara).toISOString()
-        const d = await agendarDisparo(mensagem.trim(), [...selected], canais, iso, assuntoFinal, anexo ?? undefined, eventoIdVinc)
+        const d = await agendarDisparo(mensagem.trim(), [...selected], canais, iso, assuntoFinal, anexo ?? undefined, eventoIdVinc, imagemModelo)
         toast({ title: 'Disparo agendado', description: `Para ${formatDateTime(d.agendado_para)} · ${d.total_corretores} corretor(es).` })
         carregarAgendados()
       } else {
-        const r = await dispararEmMassa(mensagem.trim(), [...selected], canais, assuntoFinal, anexo ?? undefined, eventoIdVinc)
+        const r = await dispararEmMassa(mensagem.trim(), [...selected], canais, assuntoFinal, anexo ?? undefined, eventoIdVinc, imagemModelo)
         const partes: string[] = []
         if (canalWhats) partes.push(`WhatsApp: ${r.whatsapp}`)
         if (canalEmail) partes.push(`E-mail: ${r.emails}`)
@@ -220,11 +222,19 @@ export function AdminDisparos() {
             <ModelosMensagemBar
               mensagem={mensagem}
               assunto={canalEmail ? assunto : undefined}
-              onApply={(conteudo, assuntoModelo) => {
+              onApply={(conteudo, assuntoModelo, imagemUrl) => {
                 setMensagem(conteudo)
                 if (assuntoModelo) { setAssunto(assuntoModelo); setCanalEmail(true) }
+                setModeloImagemUrl(imagemUrl ?? '')
               }}
             />
+            {modeloImagemUrl && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-lg p-2">
+                <img src={modeloImagemUrl} alt="Banner do modelo" className="w-14 h-9 object-cover rounded flex-shrink-0" />
+                <span className="flex-1">Banner do modelo será enviado com a mensagem.</span>
+                <button onClick={() => setModeloImagemUrl('')} className="text-gray-400 hover:text-red-600" title="Remover banner"><X className="w-3.5 h-3.5" /></button>
+              </div>
+            )}
           </div>
 
           {/* Canais */}

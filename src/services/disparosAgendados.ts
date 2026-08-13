@@ -34,6 +34,7 @@ export async function agendarDisparo(
   assunto?: string,
   anexo?: File,
   eventoId?: string,
+  imagemUrl?: string,
 ): Promise<DisparoAgendado> {
   const form = new FormData()
   form.append('mensagem', mensagem)
@@ -43,6 +44,7 @@ export async function agendarDisparo(
   if (assunto) form.append('assunto', assunto)
   if (anexo) form.append('file', anexo)
   if (eventoId) form.append('evento_id', eventoId)
+  if (imagemUrl) form.append('imagem_url', imagemUrl)
   return api.upload<DisparoAgendado>('/disparos-agendados', form)
 }
 

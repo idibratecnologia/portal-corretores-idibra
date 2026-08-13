@@ -447,6 +447,7 @@ model ModeloMensagem {
   nome       String
   assunto    String?  // assunto sugerido para e-mail
   conteudo   String   // texto da mensagem (aceita {nome})
+  imagem_url String?  // banner da comunicação (enviado no WhatsApp/e-mail)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -461,6 +462,7 @@ model DisparoAgendado {
   canal_whatsapp Boolean   @default(true)
   canal_email    Boolean   @default(false)
   evento_id      String?   // vincula o disparo a um evento (usa o banner do evento)
+  imagem_url     String?   // banner por URL (ex.: banner de um modelo de comunicação)
   corretor_ids   String[]
   anexo_base64   String?   // anexo opcional embutido (base64)
   anexo_nome     String?

@@ -15,6 +15,7 @@ export interface CriarDisparoAgendadoInput {
   agendadoPara: Date
   anexo?: { base64: string; fileName: string; mimeType: string }
   eventoId?: string
+  imagemUrl?: string
 }
 
 const selectResumo = {
@@ -52,7 +53,7 @@ export async function criarDisparoAgendado(i: CriarDisparoAgendadoInput) {
     data: {
       mensagem: i.mensagem, assunto: i.assunto ?? null,
       canal_whatsapp: i.canalWhatsapp, canal_email: i.canalEmail,
-      corretor_ids: i.corretorIds, agendado_para: i.agendadoPara, evento_id: i.eventoId ?? null,
+      corretor_ids: i.corretorIds, agendado_para: i.agendadoPara, evento_id: i.eventoId ?? null, imagem_url: i.imagemUrl ?? null,
       anexo_base64: i.anexo?.base64 ?? null, anexo_nome: i.anexo?.fileName ?? null, anexo_mime: i.anexo?.mimeType ?? null,
     },
     select: selectResumo,
@@ -103,7 +104,7 @@ export async function executarDisparosPendentes(): Promise<number> {
           : undefined
         const r = await broadcast(d.mensagem, d.corretor_ids, {
           whatsapp: d.canal_whatsapp, email: d.canal_email, assunto: d.assunto ?? undefined, anexo,
-          eventoId: d.evento_id ?? undefined,
+          eventoId: d.evento_id ?? undefined, imagemUrl: d.imagem_url ?? undefined,
         })
         const resultado = `WhatsApp ${r.whatsapp} · E-mail ${r.emails}${r.semCanal ? ` · ${r.semCanal} sem canal` : ''}`
         await prisma.disparoAgendado.update({

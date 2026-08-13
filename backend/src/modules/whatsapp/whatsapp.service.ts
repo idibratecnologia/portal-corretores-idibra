@@ -72,6 +72,7 @@ export async function broadcast(
     whatsapp: boolean; email: boolean; assunto?: string
     anexo?: { base64: string; fileName: string; mimeType: string }
     eventoId?: string
+    imagemUrl?: string
   } = { whatsapp: true, email: false },
 ): Promise<{ total: number; whatsapp: number; emails: number; semCanal: number }> {
   const corretores = await prisma.corretor.findMany({
@@ -79,12 +80,14 @@ export async function broadcast(
     select: { id: true, nome: true, whatsapp: true, whatsapp_opt_in: true, email: true, email_opt_in: true },
   })
 
-  // Vinculado a um evento: usa o banner do evento como imagem (WhatsApp + e-mail),
-  // desde que não haja um anexo próprio (anexo tem prioridade).
+  // Banner (imagem) do disparo — precedência: anexo próprio > banner do evento > URL (ex.: modelo).
   let bannerUrl: string | undefined
-  if (opts.eventoId && !opts.anexo) {
-    const ev = await prisma.evento.findUnique({ where: { id: opts.eventoId }, select: { banner_url: true } })
-    bannerUrl = ev?.banner_url ?? undefined
+  if (!opts.anexo) {
+    if (opts.eventoId) {
+      const ev = await prisma.evento.findUnique({ where: { id: opts.eventoId }, select: { banner_url: true } })
+      bannerUrl = ev?.banner_url ?? undefined
+    }
+    if (!bannerUrl) bannerUrl = opts.imagemUrl
   }
 
   let whatsappCount = 0

@@ -10,6 +10,8 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { NotFoundError } from '@/lib/errors'
 import { authenticate, requireAdmin } from '@/middlewares/auth.middleware'
+import { readImageUpload } from '@/lib/upload'
+import { saveImage, deleteImage } from '@/lib/storage'
 
 const idParam = z.object({ id: z.string().uuid('ID inválido') })
 const bodySchema = z.object({
@@ -41,8 +43,29 @@ export async function modelosMensagemRoutes(app: FastifyInstance) {
     return reply.send(m)
   })
 
+  // Banner do modelo de comunicação (enviado no disparo)
+  app.post('/:id/imagem', async (req, reply) => {
+    const { id } = idParam.parse(req.params)
+    const atual = await prisma.modeloMensagem.findUnique({ where: { id }, select: { imagem_url: true } })
+    if (!atual) throw new NotFoundError('Modelo não encontrado')
+    const buffer = await readImageUpload(req, { maxSizeMB: 25 })
+    const imagem_url = await saveImage('banners', buffer)
+    if (atual.imagem_url) await deleteImage(atual.imagem_url)
+    return reply.send(await prisma.modeloMensagem.update({ where: { id }, data: { imagem_url } }))
+  })
+
+  app.delete('/:id/imagem', async (req, reply) => {
+    const { id } = idParam.parse(req.params)
+    const atual = await prisma.modeloMensagem.findUnique({ where: { id }, select: { imagem_url: true } })
+    if (!atual) throw new NotFoundError('Modelo não encontrado')
+    if (atual.imagem_url) await deleteImage(atual.imagem_url)
+    return reply.send(await prisma.modeloMensagem.update({ where: { id }, data: { imagem_url: null } }))
+  })
+
   app.delete('/:id', async (req, reply) => {
     const { id } = idParam.parse(req.params)
+    const atual = await prisma.modeloMensagem.findUnique({ where: { id }, select: { imagem_url: true } })
+    if (atual?.imagem_url) await deleteImage(atual.imagem_url)
     await prisma.modeloMensagem.deleteMany({ where: { id } })
     return reply.status(204).send()
   })

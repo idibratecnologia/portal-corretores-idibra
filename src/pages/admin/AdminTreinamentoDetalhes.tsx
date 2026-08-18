@@ -294,14 +294,19 @@ export function AdminTreinamentoDetalhes() {
                 onChange={(e) => salvarCert({ certificado_modelo_id: e.target.value || null })}
                 className="w-full max-w-md rounded-lg border border-gray-200 px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500/40"
               >
-                <option value="">Certificado padrão (IDIBRA)</option>
-                {modelosCert.map((m) => (
-                  <option key={m.id} value={m.id}>{m.nome} ({m.largura}×{m.altura})</option>
-                ))}
+                <option value="">Padrão do sistema (sem arte personalizada)</option>
+                {modelosCert.length > 0 && (
+                  <optgroup label="Meus modelos de certificado">
+                    {modelosCert.map((m) => (
+                      <option key={m.id} value={m.id}>{m.nome} ({m.largura}×{m.altura})</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               <p className="text-[11px] text-gray-400 mt-1">
-                Use uma arte criada em <Link to="/admin/modelos" className="text-green-700 hover:underline">Modelos Visuais</Link> (tipo certificado), ou mantenha o padrão.
-                {modelosCert.length === 0 && ' Nenhum modelo de certificado criado ainda.'}
+                {modelosCert.length === 0
+                  ? <>Nenhuma arte de certificado criada ainda — crie uma em <Link to="/admin/modelos" className="text-green-700 hover:underline">Modelos Visuais</Link> para usá-la aqui.</>
+                  : <>A 1ª opção usa o certificado embutido do IDIBRA. Abaixo, suas artes de <Link to="/admin/modelos" className="text-green-700 hover:underline">Modelos Visuais</Link> (tipo certificado).</>}
               </p>
             </div>
 

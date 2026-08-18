@@ -44,6 +44,7 @@ export interface Treinamento {
   certificado_habilitado: boolean
   carga_horaria: number | null
   certificado_auto_enviar: boolean
+  certificado_modelo_id: string | null
   created_at: string
   updated_at: string
   _count?: { aulas: number; eventos: number; documentos: number }
@@ -159,6 +160,7 @@ export interface TreinamentoPayload {
   certificado_habilitado?: boolean
   carga_horaria?: number | null
   certificado_auto_enviar?: boolean
+  certificado_modelo_id?: string | null
 }
 
 export interface AulaPayload {

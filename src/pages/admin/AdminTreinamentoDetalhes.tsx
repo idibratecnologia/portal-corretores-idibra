@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Edit2, FileText, Trash2, Plus, Calendar, Star, Users,
-  CheckCircle2, BarChart3, Video, ListVideo, ListOrdered, Globe, Image as ImageIcon, Award,
+  CheckCircle2, BarChart3, Video, ListVideo, ListOrdered, Globe, Image as ImageIcon, Award, ChevronDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,6 +22,7 @@ import {
   uploadCapaTreinamento, removerCapaTreinamento, updateTreinamento,
   type TreinamentoDetalhe, type RelatorioTreinamento, type Aula,
 } from '@/services/treinamentos'
+import { fetchModelos, type ModeloVisual } from '@/services/modelos'
 
 function formatDataHora(iso: string | null): string {
   if (!iso) return '—'
@@ -46,6 +47,8 @@ export function AdminTreinamentoDetalhes() {
   const capaInputRef = useRef<HTMLInputElement>(null)
   const [certBusy, setCertBusy] = useState(false)
   const [cargaInput, setCargaInput] = useState('')
+  const [modelosCert, setModelosCert] = useState<ModeloVisual[]>([])
+  const [aulasOpen, setAulasOpen] = useState(false)
 
   const handleUploadCapa = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -77,7 +80,7 @@ export function AdminTreinamentoDetalhes() {
     }
   }
 
-  const salvarCert = async (patch: { certificado_habilitado?: boolean; carga_horaria?: number | null; certificado_auto_enviar?: boolean }) => {
+  const salvarCert = async (patch: { certificado_habilitado?: boolean; carga_horaria?: number | null; certificado_auto_enviar?: boolean; certificado_modelo_id?: string | null }) => {
     setCertBusy(true)
     try {
       const atualizado = await updateTreinamento(id, patch)
@@ -86,6 +89,7 @@ export function AdminTreinamentoDetalhes() {
         certificado_habilitado: atualizado.certificado_habilitado,
         carga_horaria: atualizado.carga_horaria,
         certificado_auto_enviar: atualizado.certificado_auto_enviar,
+        certificado_modelo_id: atualizado.certificado_modelo_id,
       } : prev))
       setCargaInput(atualizado.carga_horaria != null ? String(atualizado.carga_horaria) : '')
       toast({ title: 'Certificado atualizado' })
@@ -127,6 +131,11 @@ export function AdminTreinamentoDetalhes() {
 
   useEffect(() => { load(); loadRelatorio() }, [load, loadRelatorio])
   useRealtimeRefresh(load)
+
+  // Modelos visuais de certificado disponíveis (para a arte do certificado)
+  useEffect(() => {
+    fetchModelos({ tipo: 'certificado', ativo: 'true' }).then(setModelosCert).catch(() => { /* silencioso */ })
+  }, [])
 
   // Poll enquanto houver aula processando
   useEffect(() => {
@@ -277,6 +286,25 @@ export function AdminTreinamentoDetalhes() {
               <span className="text-[11px] text-gray-400 ml-2">Exibida no certificado. Deixe em branco para omitir.</span>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Modelo do certificado</label>
+              <select
+                value={t.certificado_modelo_id ?? ''}
+                disabled={certBusy}
+                onChange={(e) => salvarCert({ certificado_modelo_id: e.target.value || null })}
+                className="w-full max-w-md rounded-lg border border-gray-200 px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500/40"
+              >
+                <option value="">Certificado padrão (IDIBRA)</option>
+                {modelosCert.map((m) => (
+                  <option key={m.id} value={m.id}>{m.nome} ({m.largura}×{m.altura})</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Use uma arte criada em <Link to="/admin/modelos" className="text-green-700 hover:underline">Modelos Visuais</Link> (tipo certificado), ou mantenha o padrão.
+                {modelosCert.length === 0 && ' Nenhum modelo de certificado criado ainda.'}
+              </p>
+            </div>
+
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -294,19 +322,38 @@ export function AdminTreinamentoDetalhes() {
         )}
       </section>
 
-      {/* Aulas */}
+      {/* Aulas (acordeão — colapsado por padrão para não alongar a página) */}
       <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900 flex items-center gap-2"><ListVideo className="w-5 h-5 text-green-600" /> Aulas ({t.aulas.length})</h2>
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setAulasOpen((v) => !v)}
+            className="flex items-center gap-2 font-semibold text-gray-900 hover:text-green-700 transition-colors"
+            aria-expanded={aulasOpen}
+          >
+            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${aulasOpen ? 'rotate-180' : ''}`} />
+            <ListVideo className="w-5 h-5 text-green-600" /> Aulas ({t.aulas.length})
+          </button>
           <Button size="sm" onClick={abrirNovaAula} className="bg-green-700 hover:bg-green-800"><Plus className="w-4 h-4 mr-1" /> Nova aula</Button>
         </div>
-        {t.aulas.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
+
+        {!aulasOpen ? (
+          <button
+            type="button"
+            onClick={() => setAulasOpen(true)}
+            className="mt-3 w-full text-sm text-gray-500 hover:text-green-700 border border-dashed border-gray-200 rounded-lg py-2.5 transition-colors"
+          >
+            {t.aulas.length === 0
+              ? 'Nenhuma aula ainda — clique para gerenciar'
+              : `Mostrar ${t.aulas.length} aula${t.aulas.length === 1 ? '' : 's'}`}
+          </button>
+        ) : t.aulas.length === 0 ? (
+          <div className="text-center py-8 text-gray-400 mt-4">
             <Video className="w-10 h-10 mx-auto mb-2 text-gray-300" />
             <p className="text-sm">Nenhuma aula ainda. Adicione a primeira e faça o upload do vídeo.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 mt-4">
             {t.aulas.map((a, idx) => (
               <AulaAdmin
                 key={a.id}

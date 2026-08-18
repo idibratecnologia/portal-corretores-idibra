@@ -291,6 +291,9 @@ model Treinamento {
   certificado_habilitado  Boolean @default(false) // admin libera a emissão do certificado do curso
   carga_horaria           Float?                   // horas do curso (exibida no certificado; ex.: 4, 1.5)
   certificado_auto_enviar Boolean @default(false) // envia o certificado (email/WhatsApp) ao corretor concluir 100%
+  // Modelo Visual (tipo certificado) usado na arte; null = certificado padrão (pdfkit).
+  certificado_modelo_id   String?
+  certificado_modelo      ModeloVisual? @relation("TreinamentoCertModelo", fields: [certificado_modelo_id], references: [id], onDelete: SetNull)
 
   aulas        TreinamentoAula[]
   documentos   TreinamentoDocumento[]
@@ -429,6 +432,7 @@ model ModeloVisual {
   ativo       Boolean    @default(true)
 
   eventos     EventoModelo[]
+  treinamentos_certificado Treinamento[] @relation("TreinamentoCertModelo")
 
   created_at  DateTime   @default(now())
   updated_at  DateTime   @updatedAt

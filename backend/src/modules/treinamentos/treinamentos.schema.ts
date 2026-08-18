@@ -14,6 +14,7 @@ export const createTreinamentoSchema = z.object({
   certificado_habilitado:  z.boolean().optional(),
   carga_horaria:           z.coerce.number().positive('Carga horária inválida').max(1000, 'Carga horária inválida').optional().nullable(),
   certificado_auto_enviar: z.boolean().optional(),
+  certificado_modelo_id:   z.string().uuid('Modelo inválido').optional().nullable(),
 })
 
 export const updateTreinamentoSchema = createTreinamentoSchema.partial().extend({

@@ -21,7 +21,8 @@ import {
 } from '@/lib/treinamento-storage'
 import { enfileirarProcessamento } from '@/lib/video-queue'
 import { saveImage, deleteImage } from '@/lib/storage'
-import { gerarCertificadoTreinamentoPdf } from '@/lib/certificado'
+import { gerarCertificadoTreinamentoPdf, pngParaPdf } from '@/lib/certificado'
+import { renderModeloPng } from '@/lib/modelo-render'
 import { notifyDocument } from '@/lib/notifications'
 
 // ─── Caminhos ────────────────────────────────────────────────────
@@ -34,6 +35,7 @@ const thumbPublicoAulaDir = (tid: string, aid: string) => join(resolve(config.up
 export interface CreateTreinamentoInput {
   titulo: string; descricao?: string; obrigatorio?: boolean; liberacao_sequencial?: boolean; avulso?: boolean
   certificado_habilitado?: boolean; carga_horaria?: number | null; certificado_auto_enviar?: boolean
+  certificado_modelo_id?: string | null
 }
 export type UpdateTreinamentoInput = Partial<CreateTreinamentoInput> & { ativo?: boolean }
 
@@ -614,16 +616,85 @@ export async function emitirCertificadoSeConcluido(treinamentoId: string, corret
   return { certificado, novo: certificado.emitido_em.getTime() > Date.now() - 5_000 }
 }
 
-/** Monta o PDF do certificado a partir do registro emitido. */
+function fmtCargaCert(h?: number | null): string {
+  if (!h || h <= 0) return ''
+  const H = Math.floor(h); const m = Math.round((h - H) * 60)
+  return m > 0 ? `${H}h${String(m).padStart(2, '0')}` : `${H}h`
+}
+function fmtDataCert(d: Date): string {
+  return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+/**
+ * Mapa de variáveis do certificado de curso — usa as MESMAS chaves dos modelos
+ * de evento (nome_corretor, nome_evento, carga_horaria, qr_code…) para que uma
+ * arte de "certificado" já existente funcione tanto para evento quanto curso.
+ */
+function montarDadosCertTreinamento(cert: {
+  codigo: string; emitido_em: Date; carga_horaria: number | null
+  treinamento: { titulo: string; carga_horaria: number | null }
+  corretor: { nome: string; creci: string; email: string; cpf: string; telefone: string | null; foto_url: string | null; imobiliaria: { nome: string } | null }
+}): Record<string, string> {
+  const c = cert.corretor
+  const url_validacao = `${config.portalUrl}/validar/${cert.codigo}`
+  return {
+    nome_corretor: c.nome,
+    email_corretor: c.email,
+    cpf_corretor: c.cpf,
+    creci_corretor: c.creci,
+    telefone_corretor: c.telefone ?? '',
+    empresa_corretor: c.imobiliaria?.nome ?? '',
+    categoria_participante: 'Corretor',
+    foto_participante: c.foto_url ?? '',
+    nome_evento: cert.treinamento.titulo, // o "evento" aqui é o curso
+    data_evento: fmtDataCert(cert.emitido_em),
+    hora_evento: '',
+    local_evento: '',
+    empreendimento: '',
+    cidade_evento: '',
+    descricao_evento: '',
+    status_presenca: 'CONCLUÍDO',
+    codigo_validacao: cert.codigo,
+    numero_inscricao: cert.codigo.slice(0, 8).toUpperCase(),
+    url_validacao,
+    url_checkin: url_validacao,
+    qr_code: url_validacao,
+    data_emissao: fmtDataCert(cert.emitido_em),
+    carga_horaria: fmtCargaCert(cert.carga_horaria ?? cert.treinamento.carga_horaria),
+    nome_instrutor: '',
+  }
+}
+
+/** Monta o PDF do certificado a partir do registro emitido (modelo visual ou padrão). */
 async function montarCertificadoTreinamentoPdf(codigo: string): Promise<{ pdf: Buffer; fileName: string }> {
   const cert = await prisma.certificadoTreinamento.findUnique({
     where: { codigo },
     include: {
-      treinamento: { select: { titulo: true, carga_horaria: true } },
-      corretor: { select: { nome: true, creci: true } },
+      treinamento: {
+        select: {
+          titulo: true, carga_horaria: true,
+          certificado_modelo: { select: { canvas_json: true, largura: true, altura: true, ativo: true } },
+        },
+      },
+      corretor: {
+        select: {
+          nome: true, creci: true, email: true, cpf: true, telefone: true, foto_url: true,
+          imobiliaria: { select: { nome: true } },
+        },
+      },
     },
   })
   if (!cert) throw new NotFoundError('Certificado não encontrado')
+  const fileName = `certificado-${slugArquivo(cert.treinamento.titulo)}.pdf`
+
+  // Modelo Visual vinculado (ativo + com layout) → renderiza a arte; senão, padrão pdfkit.
+  const modelo = cert.treinamento.certificado_modelo
+  if (modelo && modelo.ativo && modelo.canvas_json) {
+    const dados = montarDadosCertTreinamento(cert)
+    const png = await renderModeloPng(modelo.canvas_json, modelo.largura, modelo.altura, dados)
+    return { pdf: await pngParaPdf(png, modelo.largura, modelo.altura), fileName }
+  }
+
   const pdf = await gerarCertificadoTreinamentoPdf({
     nome: cert.corretor.nome,
     creci: cert.corretor.creci,
@@ -633,7 +704,7 @@ async function montarCertificadoTreinamentoPdf(codigo: string): Promise<{ pdf: B
     codigo: cert.codigo,
     urlValidacao: `${config.portalUrl}/validar/${cert.codigo}`,
   })
-  return { pdf, fileName: `certificado-${slugArquivo(cert.treinamento.titulo)}.pdf` }
+  return { pdf, fileName }
 }
 
 /** Gera o PDF do certificado do curso para o corretor logado, se elegível. */

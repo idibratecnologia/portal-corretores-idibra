@@ -20,6 +20,9 @@ import {
   caminhoAbsoluto, salvarStream, removerArquivo, removerPastaTreinamento, removerPastaRel, existeArquivo,
 } from '@/lib/treinamento-storage'
 import { enfileirarProcessamento } from '@/lib/video-queue'
+import { saveImage, deleteImage } from '@/lib/storage'
+import { gerarCertificadoTreinamentoPdf } from '@/lib/certificado'
+import { notifyDocument } from '@/lib/notifications'
 
 // ─── Caminhos ────────────────────────────────────────────────────
 const relAulaOriginal = (tid: string, aid: string, fn: string) => `treinamentos/${tid}/aulas/${aid}/original/${fn}`
@@ -30,6 +33,7 @@ const thumbPublicoAulaDir = (tid: string, aid: string) => join(resolve(config.up
 // ─── Tipos de input ──────────────────────────────────────────────
 export interface CreateTreinamentoInput {
   titulo: string; descricao?: string; obrigatorio?: boolean; liberacao_sequencial?: boolean; avulso?: boolean
+  certificado_habilitado?: boolean; carga_horaria?: number | null; certificado_auto_enviar?: boolean
 }
 export type UpdateTreinamentoInput = Partial<CreateTreinamentoInput> & { ativo?: boolean }
 
@@ -120,6 +124,26 @@ export async function setAtivo(id: string, ativo: boolean) {
   await ensureTreinamento(id)
   const t = await prisma.treinamento.update({ where: { id }, data: { ativo } })
   emitAdminRefresh('treinamento-status')
+  return t
+}
+
+/** Define a capa do curso (imagem própria). Remove a anterior se houver. */
+export async function setCapa(id: string, buffer: Buffer) {
+  const atual = await prisma.treinamento.findUnique({ where: { id }, select: { capa_url: true } })
+  if (!atual) throw new NotFoundError('Treinamento não encontrado')
+  const capa_url = await saveImage('banners', buffer)
+  if (atual.capa_url) await deleteImage(atual.capa_url)
+  const t = await prisma.treinamento.update({ where: { id }, data: { capa_url } })
+  emitAdminRefresh('treinamento-atualizado')
+  return t
+}
+
+export async function removerCapa(id: string) {
+  const atual = await prisma.treinamento.findUnique({ where: { id }, select: { capa_url: true } })
+  if (!atual) throw new NotFoundError('Treinamento não encontrado')
+  if (atual.capa_url) await deleteImage(atual.capa_url)
+  const t = await prisma.treinamento.update({ where: { id }, data: { capa_url: null } })
+  emitAdminRefresh('treinamento-atualizado')
   return t
 }
 
@@ -320,7 +344,7 @@ async function progressoDoCorretor(aulaIds: string[], corretorId: string): Promi
 
 /** Resumo (card) de um treinamento para o corretor. */
 function montarResumo(
-  t: { id: string; titulo: string; descricao: string; obrigatorio: boolean },
+  t: { id: string; titulo: string; descricao: string; obrigatorio: boolean; capa_url?: string | null },
   aulas: AulaComProgresso[],
   prog: ProgressoMap,
   vinculoObrigatorio?: boolean | null,
@@ -335,7 +359,9 @@ function montarResumo(
     titulo: t.titulo,
     descricao: t.descricao,
     obrigatorio: vinculoObrigatorio ?? t.obrigatorio,
-    thumbnail_url: thumb,
+    capa_url: t.capa_url ?? null,
+    // capa própria tem prioridade; senão usa a miniatura do 1º vídeo
+    thumbnail_url: t.capa_url ?? thumb,
     total_aulas: total,
     aulas_concluidas: concluidas,
     percentual: total ? Math.round((concluidas / total) * 100) : 0,
@@ -406,6 +432,15 @@ export async function getTreinamentoCorretor(id: string, corretorId: string) {
   const prog = await progressoDoCorretor(t.aulas.map((a) => a.id), corretorId)
   const aulas = t.aulas.map((a) => montarAulaCorretor(a, aulaLiberada(a, t.liberacao_sequencial, t.aulas, prog), t.liberacao_sequencial, prog))
   const concluidas = aulas.filter((a) => a.progresso.status === 'concluido').length
+  const cursoConcluido = aulas.length > 0 && concluidas === aulas.length
+
+  // Certificado: disponível quando habilitado E o curso está 100% concluído.
+  const cert = t.certificado_habilitado && cursoConcluido
+    ? await prisma.certificadoTreinamento.findUnique({
+        where: { treinamento_id_corretor_id: { treinamento_id: t.id, corretor_id: corretorId } },
+        select: { codigo: true },
+      })
+    : null
 
   return {
     id: t.id,
@@ -418,6 +453,10 @@ export async function getTreinamentoCorretor(id: string, corretorId: string) {
     percentual: aulas.length ? Math.round((concluidas / aulas.length) * 100) : 0,
     aulas,
     documentos: t.documentos.map((d) => ({ id: d.id, titulo: d.titulo })),
+    certificado_habilitado: t.certificado_habilitado,
+    carga_horaria: t.carga_horaria,
+    certificado_disponivel: t.certificado_habilitado && cursoConcluido,
+    certificado_codigo: cert?.codigo ?? null,
   }
 }
 
@@ -502,13 +541,141 @@ export async function salvarProgressoAula(aulaId: string, corretorId: string, se
 
   // Em modo sequencial, concluir uma aula libera a próxima → avisa o front p/ refazer fetch
   const concluiuAgora = concluido && existente?.status !== 'concluido'
+
+  // Ao concluir uma aula, se isso fechou o curso e o certificado está habilitado,
+  // emite (idempotente) e dispara o envio automático (se configurado). Best-effort:
+  // uma falha aqui nunca deve derrubar o salvamento do progresso.
+  let certificadoEmitido = false
+  if (concluiuAgora) {
+    try {
+      const emit = await emitirCertificadoSeConcluido(aula.treinamento_id, corretorId)
+      if (emit) {
+        certificadoEmitido = true
+        if (emit.novo && aula.treinamento.certificado_auto_enviar) {
+          await enviarCertificadoTreinamento(aula.treinamento_id, corretorId).catch(() => {})
+        }
+      }
+    } catch { /* não bloqueia o progresso */ }
+  }
+
   return {
     status: p.status,
     percentual: p.percentual,
     segundos_assistidos: p.segundos_assistidos,
     concluido_em: p.concluido_em,
     liberou_proxima: concluiuAgora && aula.treinamento.liberacao_sequencial,
+    certificado_emitido: certificadoEmitido,
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  CERTIFICADO DE CONCLUSÃO
+// ════════════════════════════════════════════════════════════════
+
+function slugArquivo(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase().slice(0, 40) || 'certificado'
+}
+
+/** true se o corretor concluiu TODAS as aulas do treinamento (curso 100%). */
+async function cursoConcluido(treinamentoId: string, corretorId: string): Promise<boolean> {
+  const aulas = await prisma.treinamentoAula.findMany({ where: { treinamento_id: treinamentoId }, select: { id: true } })
+  if (aulas.length === 0) return false
+  const concluidas = await prisma.aulaProgresso.count({
+    where: { corretor_id: corretorId, status: 'concluido', aula_id: { in: aulas.map((a) => a.id) } },
+  })
+  return concluidas === aulas.length
+}
+
+/**
+ * Garante o certificado de (curso, corretor) quando o curso tem certificado
+ * habilitado e o corretor concluiu 100%. Idempotente (1 por curso+corretor).
+ * Retorna o certificado e se foi criado agora, ou null se ainda não elegível.
+ */
+export async function emitirCertificadoSeConcluido(treinamentoId: string, corretorId: string) {
+  const t = await prisma.treinamento.findUnique({
+    where: { id: treinamentoId },
+    select: { id: true, certificado_habilitado: true, carga_horaria: true },
+  })
+  if (!t || !t.certificado_habilitado) return null
+  if (!(await cursoConcluido(treinamentoId, corretorId))) return null
+
+  const existente = await prisma.certificadoTreinamento.findUnique({
+    where: { treinamento_id_corretor_id: { treinamento_id: treinamentoId, corretor_id: corretorId } },
+  })
+  if (existente) return { certificado: existente, novo: false }
+
+  // upsert evita corrida (duas aulas concluídas quase juntas)
+  const certificado = await prisma.certificadoTreinamento.upsert({
+    where: { treinamento_id_corretor_id: { treinamento_id: treinamentoId, corretor_id: corretorId } },
+    update: {},
+    create: { treinamento_id: treinamentoId, corretor_id: corretorId, carga_horaria: t.carga_horaria },
+  })
+  return { certificado, novo: certificado.emitido_em.getTime() > Date.now() - 5_000 }
+}
+
+/** Monta o PDF do certificado a partir do registro emitido. */
+async function montarCertificadoTreinamentoPdf(codigo: string): Promise<{ pdf: Buffer; fileName: string }> {
+  const cert = await prisma.certificadoTreinamento.findUnique({
+    where: { codigo },
+    include: {
+      treinamento: { select: { titulo: true, carga_horaria: true } },
+      corretor: { select: { nome: true, creci: true } },
+    },
+  })
+  if (!cert) throw new NotFoundError('Certificado não encontrado')
+  const pdf = await gerarCertificadoTreinamentoPdf({
+    nome: cert.corretor.nome,
+    creci: cert.corretor.creci,
+    cursoTitulo: cert.treinamento.titulo,
+    concluidoEm: cert.emitido_em,
+    cargaHoraria: cert.carga_horaria ?? cert.treinamento.carga_horaria,
+    codigo: cert.codigo,
+    urlValidacao: `${config.portalUrl}/validar/${cert.codigo}`,
+  })
+  return { pdf, fileName: `certificado-${slugArquivo(cert.treinamento.titulo)}.pdf` }
+}
+
+/** Gera o PDF do certificado do curso para o corretor logado, se elegível. */
+export async function baixarCertificadoTreinamento(
+  treinamentoId: string, corretorId: string,
+): Promise<{ pdf: Buffer; fileName: string }> {
+  const t = await prisma.treinamento.findUnique({
+    where: { id: treinamentoId },
+    select: { ativo: true, certificado_habilitado: true },
+  })
+  if (!t || !t.ativo) throw new NotFoundError('Treinamento não encontrado')
+  if (!(await corretorTemAcesso(treinamentoId, corretorId))) throw new ForbiddenError('Sem acesso a este treinamento')
+  if (!t.certificado_habilitado) throw new BadRequestError('O certificado deste curso ainda não foi liberado.')
+
+  const emit = await emitirCertificadoSeConcluido(treinamentoId, corretorId)
+  if (!emit) throw new BadRequestError('Conclua todas as aulas do curso para emitir o certificado.')
+  return montarCertificadoTreinamentoPdf(emit.certificado.codigo)
+}
+
+/** Envia o certificado (e-mail + WhatsApp, respeitando opt-in) e carimba enviado_em. */
+export async function enviarCertificadoTreinamento(treinamentoId: string, corretorId: string): Promise<void> {
+  const cert = await prisma.certificadoTreinamento.findUnique({
+    where: { treinamento_id_corretor_id: { treinamento_id: treinamentoId, corretor_id: corretorId } },
+    include: {
+      treinamento: { select: { titulo: true } },
+      corretor: { select: { nome: true, whatsapp: true, whatsapp_opt_in: true } },
+    },
+  })
+  if (!cert) throw new NotFoundError('Certificado não encontrado')
+
+  const { pdf, fileName } = await montarCertificadoTreinamentoPdf(cert.codigo)
+  const c = cert.corretor
+  await notifyDocument({
+    corretorId,
+    tipo: 'certificado',
+    whatsapp: c.whatsapp,
+    optIn: c.whatsapp_opt_in && !!c.whatsapp,
+    base64: pdf.toString('base64'),
+    fileName,
+    caption: `🎓 Parabéns, ${c.nome}! Você concluiu o curso "${cert.treinamento.titulo}". Segue o seu certificado de conclusão. — IDIBRA`,
+  })
+  await prisma.certificadoTreinamento.update({ where: { id: cert.id }, data: { enviado_em: new Date() } })
 }
 
 // ════════════════════════════════════════════════════════════════

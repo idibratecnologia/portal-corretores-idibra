@@ -2,17 +2,25 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, FileText, CheckCircle2, Lock, AlertCircle, PlayCircle,
-  ListOrdered, ListVideo,
+  ListOrdered, ListVideo, Award, Download,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/errors'
 import { statusProgressoInfo, formatDuracao } from '@/lib/treinamentos-ui'
 import {
   fetchTreinamentoCorretor, salvarProgressoAula, videoAulaUrl, documentoTreinamentoUrl,
+  certificadoTreinamentoUrl,
   type TreinamentoCorretorDetalhe, type AulaCorretor,
 } from '@/services/treinamentos'
 
 const SAVE_INTERVAL_MS = 12_000
+
+/** Formata carga horária (horas decimais) como "4h" / "1h30". */
+function formatCarga(h: number): string {
+  const H = Math.floor(h)
+  const m = Math.round((h - H) * 60)
+  return m > 0 ? `${H}h${String(m).padStart(2, '0')}` : `${H}h`
+}
 
 export function CorretorTreinamentoPlayer() {
   const { id = '' } = useParams()
@@ -65,6 +73,10 @@ export function CorretorTreinamentoPlayer() {
       if (res.status === 'concluido' && res.liberou_proxima) {
         toast({ title: 'Aula concluída! 🎉', description: 'A próxima aula foi liberada.' })
         carregar(aulaId) // refaz para liberar a próxima
+      }
+      if (res.certificado_emitido) {
+        toast({ title: 'Curso concluído! 🎓', description: 'Seu certificado já está disponível.' })
+        carregar(aulaId) // refaz para exibir o card do certificado
       }
     } catch { /* tenta de novo no próximo evento */ }
   }, [carregar, toast])
@@ -192,6 +204,32 @@ export function CorretorTreinamentoPlayer() {
               </div>
             )}
           </div>
+
+          {/* Certificado de conclusão */}
+          {t.certificado_disponivel && (
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-sm p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-11 h-11 rounded-full bg-green-600 flex items-center justify-center">
+                  <Award className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold text-gray-900">Curso concluído! 🎉</h2>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    Você concluiu todas as aulas. Baixe o seu certificado de conclusão
+                    {t.carga_horaria ? ` (carga horária: ${formatCarga(t.carga_horaria)})` : ''}.
+                  </p>
+                  <a
+                    href={certificadoTreinamentoUrl(t.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 transition-colors"
+                  >
+                    <Download className="w-4 h-4" /> Baixar certificado
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Documentos */}
           {t.documentos.length > 0 && (

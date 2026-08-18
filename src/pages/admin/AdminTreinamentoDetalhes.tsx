@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Edit2, FileText, Trash2, Plus, Calendar, Star, Users,
-  CheckCircle2, BarChart3, Video, ListVideo, ListOrdered, Globe,
+  CheckCircle2, BarChart3, Video, ListVideo, ListOrdered, Globe, Image as ImageIcon, Award,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,6 +19,7 @@ import { videoEmProcessamento, statusProgressoInfo } from '@/lib/treinamentos-ui
 import {
   fetchTreinamento, deleteAula, reordenarAulas, uploadDocumentoTreinamento,
   deleteDocumentoTreinamento, fetchRelatorioTreinamento, documentoTreinamentoUrl,
+  uploadCapaTreinamento, removerCapaTreinamento, updateTreinamento,
   type TreinamentoDetalhe, type RelatorioTreinamento, type Aula,
 } from '@/services/treinamentos'
 
@@ -41,10 +42,78 @@ export function AdminTreinamentoDetalhes() {
   const [docUploading, setDocUploading] = useState(false)
   const [relatorio, setRelatorio] = useState<RelatorioTreinamento | null>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
+  const [capaBusy, setCapaBusy] = useState(false)
+  const capaInputRef = useRef<HTMLInputElement>(null)
+  const [certBusy, setCertBusy] = useState(false)
+  const [cargaInput, setCargaInput] = useState('')
+
+  const handleUploadCapa = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    if (f.size > 25 * 1024 * 1024) { toast({ title: 'Imagem muito grande', description: 'Máximo 25 MB.', variant: 'destructive' }); return }
+    setCapaBusy(true)
+    try {
+      const atualizado = await uploadCapaTreinamento(id, f)
+      setT((prev) => (prev ? { ...prev, capa_url: atualizado.capa_url } : prev))
+      toast({ title: 'Capa atualizada' })
+    } catch (err) {
+      toast({ title: 'Erro ao enviar capa', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setCapaBusy(false)
+      if (capaInputRef.current) capaInputRef.current.value = ''
+    }
+  }
+
+  const handleRemoverCapa = async () => {
+    setCapaBusy(true)
+    try {
+      await removerCapaTreinamento(id)
+      setT((prev) => (prev ? { ...prev, capa_url: null } : prev))
+      toast({ title: 'Capa removida' })
+    } catch (err) {
+      toast({ title: 'Erro ao remover capa', description: getErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setCapaBusy(false)
+    }
+  }
+
+  const salvarCert = async (patch: { certificado_habilitado?: boolean; carga_horaria?: number | null; certificado_auto_enviar?: boolean }) => {
+    setCertBusy(true)
+    try {
+      const atualizado = await updateTreinamento(id, patch)
+      setT((prev) => (prev ? {
+        ...prev,
+        certificado_habilitado: atualizado.certificado_habilitado,
+        carga_horaria: atualizado.carga_horaria,
+        certificado_auto_enviar: atualizado.certificado_auto_enviar,
+      } : prev))
+      setCargaInput(atualizado.carga_horaria != null ? String(atualizado.carga_horaria) : '')
+      toast({ title: 'Certificado atualizado' })
+    } catch (err) {
+      toast({ title: 'Erro ao salvar', description: getErrorMessage(err), variant: 'destructive' })
+      load() // recarrega o estado real em caso de falha
+    } finally {
+      setCertBusy(false)
+    }
+  }
+
+  const salvarCarga = () => {
+    const raw = cargaInput.trim().replace(',', '.')
+    const num = raw === '' ? null : Number(raw)
+    if (num !== null && (!Number.isFinite(num) || num <= 0)) {
+      toast({ title: 'Carga horária inválida', description: 'Informe um número de horas maior que zero (ex.: 4 ou 1.5).', variant: 'destructive' })
+      setCargaInput(t?.carga_horaria != null ? String(t.carga_horaria) : '')
+      return
+    }
+    if (num === (t?.carga_horaria ?? null)) return // sem mudança
+    salvarCert({ carga_horaria: num })
+  }
 
   const load = useCallback(async () => {
     try {
-      setT(await fetchTreinamento(id))
+      const data = await fetchTreinamento(id)
+      setT(data)
+      setCargaInput(data.carga_horaria != null ? String(data.carga_horaria) : '')
     } catch (err) {
       toast({ title: 'Erro ao carregar', description: getErrorMessage(err), variant: 'destructive' })
     } finally {
@@ -140,6 +209,90 @@ export function AdminTreinamentoDetalhes() {
           <Edit2 className="w-4 h-4 mr-2" /> Editar
         </Button>
       </div>
+
+      {/* Capa do curso */}
+      <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <ImageIcon className="w-4 h-4 text-green-600" />
+          <h2 className="font-semibold text-gray-900">Capa do curso</h2>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="relative w-40 h-24 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0 border border-gray-200">
+            {t.capa_url
+              ? <img src={t.capa_url} alt="Capa" className="w-full h-full object-cover" />
+              : <ImageIcon className="w-6 h-6 text-gray-300" />}
+            {capaBusy && <div className="absolute inset-0 bg-white/70 flex items-center justify-center"><Loader2 className="w-5 h-5 text-green-600 animate-spin" /></div>}
+          </div>
+          <div>
+            <input ref={capaInputRef} type="file" accept="image/*" onChange={handleUploadCapa} className="hidden" />
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => capaInputRef.current?.click()} disabled={capaBusy} className="gap-1.5 border-gray-200">
+                {capaBusy ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Enviando…</> : <><ImageIcon className="w-3.5 h-3.5" /> {t.capa_url ? 'Trocar capa' : 'Enviar capa'}</>}
+              </Button>
+              {t.capa_url && !capaBusy && (
+                <Button variant="ghost" size="sm" onClick={handleRemoverCapa} className="text-gray-500 hover:text-red-600">Remover</Button>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1.5">JPG/PNG até 25 MB · recomendado 1200×630. Aparece nos cards do curso para o corretor.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Certificado de conclusão */}
+      <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Award className="w-4 h-4 text-green-600" />
+          <h2 className="font-semibold text-gray-900">Certificado de conclusão</h2>
+          {certBusy && <Loader2 className="w-4 h-4 text-green-600 animate-spin" />}
+        </div>
+
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={t.certificado_habilitado}
+            disabled={certBusy}
+            onChange={(e) => salvarCert({ certificado_habilitado: e.target.checked })}
+            className="mt-0.5 w-4 h-4 accent-green-600"
+          />
+          <span>
+            <span className="text-sm font-medium text-gray-800">Emitir certificado ao concluir o curso</span>
+            <span className="block text-[11px] text-gray-400">O corretor poderá baixar o certificado (com QR de validação) ao concluir 100% das aulas.</span>
+          </span>
+        </label>
+
+        {t.certificado_habilitado && (
+          <div className="mt-4 pl-7 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Carga horária (horas)</label>
+              <input
+                type="number" min="0" step="0.5" inputMode="decimal"
+                value={cargaInput}
+                disabled={certBusy}
+                onChange={(e) => setCargaInput(e.target.value)}
+                onBlur={salvarCarga}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                placeholder="Ex.: 4"
+                className="w-32 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40"
+              />
+              <span className="text-[11px] text-gray-400 ml-2">Exibida no certificado. Deixe em branco para omitir.</span>
+            </div>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={t.certificado_auto_enviar}
+                disabled={certBusy}
+                onChange={(e) => salvarCert({ certificado_auto_enviar: e.target.checked })}
+                className="mt-0.5 w-4 h-4 accent-green-600"
+              />
+              <span>
+                <span className="text-sm font-medium text-gray-800">Enviar automaticamente ao concluir</span>
+                <span className="block text-[11px] text-gray-400">Envia o certificado por e-mail e WhatsApp (respeitando o opt-in) assim que o corretor concluir o curso.</span>
+              </span>
+            </label>
+          </div>
+        )}
+      </section>
 
       {/* Aulas */}
       <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">

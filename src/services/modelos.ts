@@ -115,7 +115,9 @@ export async function fetchGeracoes(eventoId: string): Promise<Array<{ tipo: Tip
 
 export interface ValidacaoResult {
   valido: boolean
-  nome?: string; creci?: string; evento?: string; data?: string; local?: string; status?: string; presente?: boolean
+  tipo?: 'evento' | 'treinamento'
+  nome?: string; creci?: string; evento?: string; data?: string; local?: string | null; status?: string; presente?: boolean
+  carga_horaria?: string
 }
 
 export async function fetchValidacao(codigo: string): Promise<ValidacaoResult> {

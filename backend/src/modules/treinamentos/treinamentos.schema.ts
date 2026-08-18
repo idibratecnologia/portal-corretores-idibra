@@ -10,6 +10,10 @@ export const createTreinamentoSchema = z.object({
   obrigatorio:          z.boolean().optional(),
   liberacao_sequencial: z.boolean().optional(),
   avulso:               z.boolean().optional(),
+  // Certificado de conclusão
+  certificado_habilitado:  z.boolean().optional(),
+  carga_horaria:           z.coerce.number().positive('Carga horária inválida').max(1000, 'Carga horária inválida').optional().nullable(),
+  certificado_auto_enviar: z.boolean().optional(),
 })
 
 export const updateTreinamentoSchema = createTreinamentoSchema.partial().extend({

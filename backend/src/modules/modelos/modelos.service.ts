@@ -242,18 +242,46 @@ export async function contarGeracoes(eventoId: string): Promise<Array<{ tipo: st
   return grupos.map((g) => ({ tipo: g.tipo, total: g._count._all }))
 }
 
-/** Validação pública (QR do certificado) — busca a inscrição pelo token. */
+/** Validação pública (QR do certificado) — participação em evento OU conclusão de curso. */
 export async function getValidacao(codigo: string) {
+  // 1) Participação em evento (token da inscrição)
   const insc = await prisma.inscricao.findUnique({ where: { qr_code_token: codigo }, include: INCLUDE_DADOS })
-  if (!insc) return { valido: false as const }
-  return {
-    valido: true as const,
-    nome: insc.corretor.nome,
-    creci: insc.corretor.creci,
-    evento: insc.evento.titulo,
-    data: fmtData(insc.evento.data_evento),
-    local: insc.evento.local,
-    status: STATUS_LABEL[insc.status] ?? insc.status,
-    presente: insc.status === 'presente',
+  if (insc) {
+    return {
+      valido: true as const,
+      tipo: 'evento' as const,
+      nome: insc.corretor.nome,
+      creci: insc.corretor.creci,
+      evento: insc.evento.titulo,
+      data: fmtData(insc.evento.data_evento),
+      local: insc.evento.local,
+      status: STATUS_LABEL[insc.status] ?? insc.status,
+      presente: insc.status === 'presente',
+    }
   }
+
+  // 2) Conclusão de curso (código do certificado de treinamento)
+  const cert = await prisma.certificadoTreinamento.findUnique({
+    where: { codigo },
+    include: {
+      treinamento: { select: { titulo: true, carga_horaria: true } },
+      corretor: { select: { nome: true, creci: true } },
+    },
+  })
+  if (cert) {
+    return {
+      valido: true as const,
+      tipo: 'treinamento' as const,
+      nome: cert.corretor.nome,
+      creci: cert.corretor.creci,
+      evento: cert.treinamento.titulo,
+      data: fmtData(cert.emitido_em),
+      local: null,
+      status: 'CURSO CONCLUÍDO',
+      presente: true,
+      carga_horaria: fmtCarga(cert.carga_horaria ?? cert.treinamento.carga_horaria),
+    }
+  }
+
+  return { valido: false as const }
 }

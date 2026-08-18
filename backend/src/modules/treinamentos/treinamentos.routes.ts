@@ -43,6 +43,7 @@ import {
   createAulaSchema, updateAulaSchema, ordenarSchema, progressoSchema,
 } from './treinamentos.schema'
 import { authenticate, requireAdmin, requireSuperAdmin, requireCorretor } from '@/middlewares/auth.middleware'
+import { readImageUpload } from '@/lib/upload'
 import { verifyToken } from '@/lib/jwt'
 import type { JWTPayload } from '@/lib/jwt'
 import { BadRequestError, UnauthorizedError } from '@/lib/errors'
@@ -88,6 +89,18 @@ export async function treinamentosRoutes(app: FastifyInstance) {
     const { id } = idParam.parse(req.params)
     await service.deleteTreinamento(id)
     return reply.status(204).send()
+  })
+
+  // Capa do curso (imagem própria)
+  app.post('/treinamentos/:id/capa', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
+    const { id } = idParam.parse(req.params)
+    const buffer = await readImageUpload(req, { maxSizeMB: 25 })
+    return reply.send(await service.setCapa(id, buffer))
+  })
+
+  app.delete('/treinamentos/:id/capa', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
+    const { id } = idParam.parse(req.params)
+    return reply.send(await service.removerCapa(id))
   })
 
   app.get('/treinamentos/:id/relatorio', { preHandler: [authenticate, requireAdmin] }, async (req, reply) => {
@@ -236,5 +249,17 @@ export async function treinamentosRoutes(app: FastifyInstance) {
     reply.header('Content-Type', 'application/octet-stream')
     reply.header('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`)
     return reply.send(createReadStream(abs))
+  })
+
+  // Certificado de conclusão (corretor) — gera o PDF sob demanda (token no header ou ?token=)
+  app.get('/treinamentos/:id/certificado', async (req, reply) => {
+    const { id } = idParam.parse(req.params)
+    const user = userFromRequest(req)
+    if (!user) throw new UnauthorizedError('Não autenticado')
+    if (user.role === 'admin') throw new BadRequestError('O certificado é emitido para o corretor que concluiu o curso.')
+    const { pdf, fileName } = await service.baixarCertificadoTreinamento(id, user.sub)
+    reply.header('Content-Type', 'application/pdf')
+    reply.header('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`)
+    return reply.send(pdf)
   })
 }

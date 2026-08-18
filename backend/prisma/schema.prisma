@@ -116,6 +116,7 @@ model Corretor {
   notificacoes      NotificacaoLog[]
   convites          EventoConvidado[]
   progresso_aulas        AulaProgresso[]
+  certificados_treinamento CertificadoTreinamento[]
 
   created_at        DateTime       @default(now())
   updated_at        DateTime       @updatedAt
@@ -276,6 +277,7 @@ model Treinamento {
   id          String   @id @default(uuid())
   titulo      String
   descricao   String   @default("")
+  capa_url    String?  // capa própria do curso (identidade visual)
   ativo       Boolean  @default(true)
   obrigatorio Boolean  @default(false)
   // true = disponível a todos os corretores, sem precisar vincular a um evento.
@@ -285,9 +287,15 @@ model Treinamento {
   // Se false: cada aula usa a sua própria data_liberacao.
   liberacao_sequencial Boolean @default(false)
 
-  aulas      TreinamentoAula[]
-  documentos TreinamentoDocumento[]
-  eventos    TreinamentoEvento[]
+  // ─── Certificado de conclusão ───────────────────────────────────
+  certificado_habilitado  Boolean @default(false) // admin libera a emissão do certificado do curso
+  carga_horaria           Float?                   // horas do curso (exibida no certificado; ex.: 4, 1.5)
+  certificado_auto_enviar Boolean @default(false) // envia o certificado (email/WhatsApp) ao corretor concluir 100%
+
+  aulas        TreinamentoAula[]
+  documentos   TreinamentoDocumento[]
+  eventos      TreinamentoEvento[]
+  certificados CertificadoTreinamento[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -380,6 +388,26 @@ model AulaProgresso {
   @@unique([aula_id, corretor_id])
   @@index([corretor_id])
   @@map("aula_progressos")
+}
+
+// Certificado de conclusão de um treinamento por corretor (1 por curso+corretor).
+// O `codigo` é usado no QR e na validação pública (/validar/:codigo).
+model CertificadoTreinamento {
+  id             String      @id @default(uuid())
+  treinamento_id String
+  corretor_id    String
+  treinamento    Treinamento @relation(fields: [treinamento_id], references: [id], onDelete: Cascade)
+  corretor       Corretor    @relation(fields: [corretor_id], references: [id], onDelete: Cascade)
+
+  codigo        String  @unique @default(uuid()) // código de validação (QR / página pública)
+  carga_horaria Float?                            // congela a carga horária no momento da emissão
+  enviado_em    DateTime?                         // carimbo do envio automático (idempotência)
+
+  emitido_em DateTime @default(now())
+
+  @@unique([treinamento_id, corretor_id])
+  @@index([corretor_id])
+  @@map("certificados_treinamento")
 }
 
 // ─── Modelos Visuais (editor estilo Canva) ──────────────────────

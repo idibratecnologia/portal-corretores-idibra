@@ -56,7 +56,7 @@ export async function listCorretores(filters: ListCorretoresInput) {
 
   // WHERE em SQL (permite ordenar por lower() e buscar CPF ignorando pontuação).
   const conds: Prisma.Sql[] = []
-  if (filters.status)         conds.push(Prisma.sql`status = ${filters.status}`)
+  if (filters.status)         conds.push(Prisma.sql`status = ${filters.status}::"StatusCorretor"`)
   if (filters.imobiliaria_id) conds.push(Prisma.sql`imobiliaria_id = ${filters.imobiliaria_id}::uuid`)
   if (filters.search) {
     const like = `%${filters.search}%`

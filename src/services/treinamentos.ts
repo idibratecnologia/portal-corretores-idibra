@@ -36,10 +36,14 @@ export interface Treinamento {
   id: string
   titulo: string
   descricao: string
+  capa_url: string | null
   ativo: boolean
   obrigatorio: boolean
   liberacao_sequencial: boolean
   avulso: boolean
+  certificado_habilitado: boolean
+  carga_horaria: number | null
+  certificado_auto_enviar: boolean
   created_at: string
   updated_at: string
   _count?: { aulas: number; eventos: number; documentos: number }
@@ -114,6 +118,10 @@ export interface TreinamentoCorretorDetalhe {
   percentual: number
   aulas: AulaCorretor[]
   documentos: DocumentoApoio[]
+  certificado_habilitado: boolean
+  carga_horaria: number | null
+  certificado_disponivel: boolean
+  certificado_codigo: string | null
 }
 
 export interface VinculoTreinamento {
@@ -148,6 +156,9 @@ export interface TreinamentoPayload {
   obrigatorio?: boolean
   liberacao_sequencial?: boolean
   avulso?: boolean
+  certificado_habilitado?: boolean
+  carga_horaria?: number | null
+  certificado_auto_enviar?: boolean
 }
 
 export interface AulaPayload {
@@ -180,6 +191,17 @@ export async function updateTreinamento(id: string, payload: Partial<Treinamento
 
 export async function setAtivoTreinamento(id: string, ativo: boolean): Promise<Treinamento> {
   return api.patch<Treinamento>(`/treinamentos/${id}`, { ativo })
+}
+
+/** Capa própria do curso. */
+export async function uploadCapaTreinamento(id: string, file: File): Promise<Treinamento> {
+  const form = new FormData()
+  form.append('file', file)
+  return api.upload<Treinamento>(`/treinamentos/${id}/capa`, form)
+}
+
+export async function removerCapaTreinamento(id: string): Promise<Treinamento> {
+  return api.delete<Treinamento>(`/treinamentos/${id}/capa`)
 }
 
 export async function deleteTreinamento(id: string): Promise<void> {
@@ -288,7 +310,7 @@ export async function fetchTreinamentoCorretor(id: string): Promise<TreinamentoC
 export async function salvarProgressoAula(
   aulaId: string,
   segundos: number,
-): Promise<ProgressoCorretor & { liberou_proxima: boolean }> {
+): Promise<ProgressoCorretor & { liberou_proxima: boolean; certificado_emitido?: boolean }> {
   return api.post(`/treinamentos/aulas/${aulaId}/progresso`, { segundos })
 }
 
@@ -300,4 +322,9 @@ export function videoAulaUrl(aulaId: string): string {
 
 export function documentoTreinamentoUrl(docId: string): string {
   return `${apiBaseUrl}/treinamentos/documentos/${docId}/download?token=${encodeURIComponent(getToken() ?? '')}`
+}
+
+/** URL do certificado de conclusão (PDF) — token na query p/ <a download>. */
+export function certificadoTreinamentoUrl(treinamentoId: string): string {
+  return `${apiBaseUrl}/treinamentos/${treinamentoId}/certificado?token=${encodeURIComponent(getToken() ?? '')}`
 }

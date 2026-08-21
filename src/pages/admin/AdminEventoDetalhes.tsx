@@ -231,13 +231,13 @@ export function AdminEventoDetalhes() {
           <button
             type="button"
             onClick={() => setBannerModal(true)}
-            className="group relative block w-full h-48 sm:h-56 overflow-hidden cursor-zoom-in"
+            className="group relative block w-full overflow-hidden cursor-zoom-in bg-gray-50"
             aria-label="Ver imagem completa do banner"
           >
             <img
               src={evento.banner_url}
               alt={evento.titulo}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className="w-full h-auto max-h-[70vh] object-contain transition-transform duration-500 group-hover:scale-105"
             />
             <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
             <span className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">

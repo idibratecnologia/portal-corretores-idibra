@@ -53,15 +53,15 @@ export function PublicEventoPage() {
 
       <main className="max-w-3xl mx-auto px-5 py-8">
         {/* Banner */}
-        <div className="w-full aspect-[1200/630] rounded-2xl border border-gray-100 overflow-hidden mb-6 bg-gradient-to-br from-green-100 to-green-200">
-          {evento.banner_url ? (
-            <img src={evento.banner_url} alt={evento.titulo} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Calendar className="w-16 h-16 text-green-400" />
-            </div>
-          )}
-        </div>
+        {evento.banner_url ? (
+          <div className="w-full rounded-2xl border border-gray-100 overflow-hidden mb-6 bg-gray-50">
+            <img src={evento.banner_url} alt={evento.titulo} className="w-full h-auto max-h-[80vh] object-contain" />
+          </div>
+        ) : (
+          <div className="w-full aspect-[1200/630] rounded-2xl border border-gray-100 overflow-hidden mb-6 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+            <Calendar className="w-16 h-16 text-green-400" />
+          </div>
+        )}
 
         <span className="inline-block text-xs font-semibold text-green-700 bg-green-50 px-3 py-1 rounded-full capitalize mb-3">{evento.tipo}</span>
         <h1 className="text-3xl font-bold text-gray-900 leading-tight">{evento.titulo}</h1>
